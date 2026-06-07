@@ -1,0 +1,76 @@
+{
+    "name": "sympress/migration",
+    "description": "MU plugin for handling migrations on website level",
+    "type": "wordpress-muplugin",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "Brian Schäffner",
+            "email": "brian.schaeffner@sympress.de",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.5",
+        "sympress/kernel": "@dev",
+        "symfony/console": "^8.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5",
+        "mockery/mockery": "^1.6",
+        "phpstan/phpstan": "^2.1",
+        "friendsofphp/php-cs-fixer": "^3.94",
+        "inpsyde/php-coding-standards": "^2.0",
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+        "brain/monkey": "^2",
+        "symfony/var-dumper": "^7"
+    },
+    "autoload": {
+        "psr-4": {
+            "SymPress\\WordPress\\Migration\\": "src/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit --no-coverage",
+        "test:unit": "phpunit --no-coverage --testsuite Unit",
+        "test:integration": "phpunit --no-coverage --testsuite Integration",
+        "test:coverage": "phpunit --coverage-html coverage-html",
+        "cs:analyze": "phpstan analyse -c phpstan.neon.dist --no-progress",
+        "cs:style": "php-cs-fixer fix --dry-run --diff --using-cache=no --config=.php-cs-fixer.dist.php",
+        "cs:style:fix": "php-cs-fixer fix --using-cache=no --config=.php-cs-fixer.dist.php",
+        "cs:audit": "phpcs --standard=phpcs.xml.dist",
+        "cs:audit:fix": "phpcbf --standard=phpcs.xml.dist",
+        "cs": [
+            "@cs:style",
+            "@cs:audit"
+        ],
+        "cs:fix": [
+            "@cs:style:fix",
+            "@cs:audit"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "./../*",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
+    "extra": {
+        "wordpress-install-dir": "vendor/wordpress/wordpress",
+        "kernel": {
+            "bundle": "SymPress\\WordPress\\Migration\\MigrationBundle",
+            "entry": "migration/migration.php"
+        }
+    }
+}

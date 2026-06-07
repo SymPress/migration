@@ -1,0 +1,66 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        public: false
+
+    wpdb:
+        class: wpdb
+        factory: ['SymPress\WordPress\Migration\Factory\MigrationServiceFactory', 'database']
+        public: true
+
+    SymPress\WordPress\Migration\Registry\MigrationRegistry:
+        factory: ['SymPress\WordPress\Migration\Factory\MigrationServiceFactory', 'registry']
+        public: true
+
+    SymPress\WordPress\Migration\Application\MigrationSystem:
+        factory: ['SymPress\WordPress\Migration\Factory\MigrationServiceFactory', 'system']
+        arguments: ['@wpdb']
+        public: true
+
+    SymPress\WordPress\Migration\Infrastructure\MigrationTracker:
+        factory: ['SymPress\WordPress\Migration\Factory\MigrationServiceFactory', 'tracker']
+        arguments: ['@SymPress\WordPress\Migration\Application\MigrationSystem']
+
+    SymPress\WordPress\Migration\Contract\MigrationStore:
+        alias: SymPress\WordPress\Migration\Infrastructure\MigrationTracker
+        public: true
+
+    SymPress\WordPress\Migration\Application\MigrationManagerFactory:
+        factory: ['SymPress\WordPress\Migration\Factory\MigrationServiceFactory', 'managerFactory']
+        arguments: ['@SymPress\WordPress\Migration\Application\MigrationSystem']
+
+    SymPress\WordPress\Migration\Application\MigrationLifecycle:
+        factory: ['SymPress\WordPress\Migration\Factory\MigrationServiceFactory', 'lifecycle']
+        arguments: ['@SymPress\WordPress\Migration\Application\MigrationManagerFactory']
+
+    SymPress\WordPress\Migration\Application\MigrationStatusReporter: ~
+
+    SymPress\WordPress\Migration\Console\MigrationStatusCommand: ~
+
+    SymPress\WordPress\Migration\Cli\SymfonyConsoleRunner: ~
+
+    SymPress\WordPress\Migration\Infrastructure\WordPressSqlExecutor:
+        factory: ['SymPress\WordPress\Migration\Factory\MigrationServiceFactory', 'sqlExecutor']
+        arguments: ['@SymPress\WordPress\Migration\Application\MigrationLifecycle']
+
+    SymPress\WordPress\Migration\Contract\MigrationSqlExecutor:
+        alias: SymPress\WordPress\Migration\Infrastructure\WordPressSqlExecutor
+        public: true
+
+    SymPress\WordPress\Migration\Cli\MigrationCommand:
+        public: true
+
+    SymPress\WordPress\Migration\Cli\MigrationBootstrap:
+        factory: ['SymPress\WordPress\Migration\Factory\MigrationServiceFactory', 'cliBootstrap']
+        arguments:
+            - '@SymPress\WordPress\Migration\Registry\MigrationRegistry'
+            - '@SymPress\WordPress\Migration\Cli\MigrationCommand'
+
+    SymPress\WordPress\Migration\Hook\MigrationSystemBootstrap:
+        tags:
+            - { name: kernel.hook, hook: 'muplugins_loaded', method: initialize, priority: 2 }
+
+    SymPress\WordPress\Migration\Hook\MigrationCliBootstrap:
+        tags:
+            - { name: kernel.hook, hook: 'muplugins_loaded', method: initialize, priority: 3 }

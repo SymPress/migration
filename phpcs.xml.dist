@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<ruleset name="Migration MU Plugin">
+    <description>
+        WordPress and security-focused coding standard audit for the migration MU plugin.
+        Auto-formatting stays in PHP CS Fixer; PHPCS enforces the Inpsyde standard.
+    </description>
+
+    <arg name="colors"/>
+    <arg value="sp"/>
+    <arg name="basepath" value="."/>
+
+    <config name="testVersion" value="8.5-"/>
+    <config name="text_domain" value="migration"/>
+
+    <file>migration.php</file>
+    <file>src</file>
+
+    <exclude-pattern>vendor/*</exclude-pattern>
+    <exclude-pattern>.phpunit.cache/*</exclude-pattern>
+    <exclude-pattern>.hooktest.php</exclude-pattern>
+
+    <!--
+        PHPCS does not reliably parse PHP 8.5 property hooks yet.
+        These value objects remain covered by PHP CS Fixer, PHPStan and PHPUnit.
+    -->
+    <exclude-pattern>src/Value/PluginSlug.php</exclude-pattern>
+    <exclude-pattern>src/Value/MigrationRecord.php</exclude-pattern>
+    <exclude-pattern>src/Value/MigrationExecution.php</exclude-pattern>
+
+    <rule ref="Inpsyde">
+        <!-- PHP 8.5 property hooks are not parsed reliably by PHPCS yet. -->
+        <exclude name="Inpsyde.CodeQuality.NoAccessors"/>
+        <exclude name="WordPress.PHP.DevelopmentFunctions.error_log_trigger_error"/>
+        <exclude name="WordPress.PHP.POSIXFunctions"/>
+    </rule>
+
+    <rule ref="Inpsyde.CodeQuality.Psr4">
+        <properties>
+            <property name="psr4" type="array">
+                <element key="SymPress\WordPress\Migration" value="src"/>
+            </property>
+        </properties>
+    </rule>
+</ruleset>
