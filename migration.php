@@ -19,18 +19,5 @@ if (!defined('ABSPATH')) {
 }
 
 if (!class_exists(MigrationBundle::class)) {
-    foreach (
-        [
-            dirname(__DIR__, 2) . '/vendor/autoload.php',
-            dirname(__DIR__) . '/vendor/autoload.php',
-            __DIR__ . '/vendor/autoload.php',
-        ] as $autoloader
-    ) {
-        if (!is_readable($autoloader)) {
-            continue;
-        }
-
-        require_once $autoloader;
-        break;
-    }
+    require_once __DIR__ . '/vendor/autoload.php';
 }
