@@ -204,3 +204,7 @@ composer cs
 composer cs:fix
 composer validate --strict
 ```
+
+## License
+
+This package is licensed under `GPL-2.0-or-later`.
