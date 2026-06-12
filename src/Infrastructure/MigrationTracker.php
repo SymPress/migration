@@ -13,7 +13,6 @@ final class MigrationTracker implements MigrationStore
     private const string TABLE_NAME = 'migrations';
     private const string HISTORY_TABLE_NAME = 'migration_history';
 
-    private readonly \wpdb $database;
     private string $tableName;
     private string $historyTableName;
     private bool $tableChecked = false;
@@ -22,9 +21,8 @@ final class MigrationTracker implements MigrationStore
     private bool $historyTableCreated = false;
     private bool $autoCleanup = false;
 
-    public function __construct(\wpdb $database, ?string $tableName = null)
+    public function __construct(private readonly \wpdb $database, ?string $tableName = null)
     {
-        $this->database = $database;
         $this->tableName = $tableName ?? $database->prefix . self::TABLE_NAME;
         $this->historyTableName = $database->prefix . self::HISTORY_TABLE_NAME;
     }
@@ -108,7 +106,7 @@ final class MigrationTracker implements MigrationStore
         $result = $this->database->delete(
             $this->tableName,
             [
-                'plugin' => $plugin,
+                'plugin'    => $plugin,
                 'migration' => $migrationName,
             ],
             ['%s', '%s'],
@@ -150,9 +148,7 @@ final class MigrationTracker implements MigrationStore
         return true;
     }
 
-    /**
-     * @return array{plugin: string, migration: string, version: string, migrated_at: string}|null
-     */
+    /** @return array{plugin: string, migration: string, version: string, migrated_at: string}|null */
     public function get(string $plugin, string $migrationName): ?array
     {
         $record = $this->findRecord($plugin, $migrationName);
@@ -200,9 +196,7 @@ final class MigrationTracker implements MigrationStore
         return $record['version'];
     }
 
-    /**
-     * @return list<array{plugin: string, migration: string, version: string, migrated_at: string}>
-     */
+    /** @return list<array{plugin: string, migration: string, version: string, migrated_at: string}> */
     public function getAllForPlugin(string $plugin): array
     {
         return array_map(
@@ -211,9 +205,7 @@ final class MigrationTracker implements MigrationStore
         );
     }
 
-    /**
-     * @return list<MigrationRecord>
-     */
+    /** @return list<MigrationRecord> */
     #[\Override]
     public function findRecordsForPlugin(string $plugin): array
     {
@@ -239,9 +231,7 @@ final class MigrationTracker implements MigrationStore
         return $this->mapRecords($results);
     }
 
-    /**
-     * @return list<array{plugin: string, migration: string, version: string, migrated_at: string}>
-     */
+    /** @return list<array{plugin: string, migration: string, version: string, migrated_at: string}> */
     public function getAll(): array
     {
         return array_map(
@@ -250,9 +240,7 @@ final class MigrationTracker implements MigrationStore
         );
     }
 
-    /**
-     * @return list<MigrationRecord>
-     */
+    /** @return list<MigrationRecord> */
     #[\Override]
     public function findAllRecords(): array
     {
@@ -318,10 +306,10 @@ final class MigrationTracker implements MigrationStore
         $result = $this->database->insert(
             $this->historyTableName,
             [
-                'plugin' => $execution->plugin,
-                'migration' => $execution->migration,
-                'version' => $execution->version,
-                'direction' => $execution->direction,
+                'plugin'      => $execution->plugin,
+                'migration'   => $execution->migration,
+                'version'     => $execution->version,
+                'direction'   => $execution->direction,
                 'executed_at' => $execution->executedAt,
             ],
             ['%s', '%s', '%s', '%s', '%s'],
@@ -330,9 +318,7 @@ final class MigrationTracker implements MigrationStore
         return $result !== false;
     }
 
-    /**
-     * @return list<MigrationExecution>
-     */
+    /** @return list<MigrationExecution> */
     #[\Override]
     public function findHistoryForPlugin(string $pluginSlug): array
     {
@@ -358,9 +344,7 @@ final class MigrationTracker implements MigrationStore
         return $this->mapExecutions($results);
     }
 
-    /**
-     * @return list<MigrationExecution>
-     */
+    /** @return list<MigrationExecution> */
     #[\Override]
     public function findAllHistory(): array
     {
@@ -386,9 +370,9 @@ final class MigrationTracker implements MigrationStore
         $result = $this->database->insert(
             $this->tableName,
             [
-                'plugin' => $record->plugin,
-                'migration' => $record->migration,
-                'version' => $record->version,
+                'plugin'      => $record->plugin,
+                'migration'   => $record->migration,
+                'version'     => $record->version,
                 'migrated_at' => $record->migratedAt,
             ],
             ['%s', '%s', '%s', '%s'],
@@ -402,11 +386,11 @@ final class MigrationTracker implements MigrationStore
         $result = $this->database->update(
             $this->tableName,
             [
-                'version' => $record->version,
+                'version'     => $record->version,
                 'migrated_at' => $record->migratedAt,
             ],
             [
-                'plugin' => $record->plugin,
+                'plugin'    => $record->plugin,
                 'migration' => $record->migration,
             ],
             ['%s', '%s'],

@@ -12,9 +12,7 @@ final readonly class WordPressSqlExecutor implements MigrationSqlExecutor
     {
     }
 
-    /**
-     * @param string|list<string> $statements
-     */
+    /** @param string|list<string> $statements */
     #[\Override]
     public function execute(string|array $statements): bool
     {
