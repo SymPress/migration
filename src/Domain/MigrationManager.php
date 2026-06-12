@@ -35,9 +35,7 @@ class MigrationManager
         return $this;
     }
 
-    /**
-     * @param iterable<MigrationContract> $migrations
-     */
+    /** @param iterable<MigrationContract> $migrations */
     public function registerMigrations(iterable $migrations): self
     {
         foreach ($migrations as $migration) {
@@ -47,9 +45,7 @@ class MigrationManager
         return $this;
     }
 
-    /**
-     * @return array<class-string<MigrationContract>, MigrationContract>
-     */
+    /** @return array<class-string<MigrationContract>, MigrationContract> */
     public function all(): array
     {
         return $this->migrations->all();
@@ -201,9 +197,7 @@ class MigrationManager
         return !$this->hasPendingMigrations();
     }
 
-    /**
-     * @return list<array{plugin: string, migration: string, version: string, migrated_at: string}>
-     */
+    /** @return list<array{plugin: string, migration: string, version: string, migrated_at: string}> */
     public function getMigratedVersions(): array
     {
         return array_map(
@@ -249,9 +243,9 @@ class MigrationManager
             }
 
             $current = [
-                'class' => $migration::class,
-                'name' => $this->extractClassName($migration::class),
-                'version' => $record->version,
+                'class'       => $migration::class,
+                'name'        => $this->extractClassName($migration::class),
+                'version'     => $record->version,
                 'migrated_at' => $record->migratedAt,
             ];
         }
@@ -259,9 +253,7 @@ class MigrationManager
         return $current;
     }
 
-    /**
-     * @return array{class: class-string<MigrationContract>, name: string, version: string}|null
-     */
+    /** @return array{class: class-string<MigrationContract>, name: string, version: string}|null */
     public function getLatestMigration(): ?array
     {
         $migrations = $this->migrations->inRegistrationOrder();
@@ -272,8 +264,8 @@ class MigrationManager
         }
 
         return [
-            'class' => $latest::class,
-            'name' => $this->extractClassName($latest::class),
+            'class'   => $latest::class,
+            'name'    => $this->extractClassName($latest::class),
             'version' => $latest->getVersion(),
         ];
     }
@@ -283,9 +275,7 @@ class MigrationManager
         return $this->lifecycle->ensureStorageIsReady();
     }
 
-    /**
-     * @return list<array{class: class-string<MigrationContract>, name: string, version: string}>
-     */
+    /** @return list<array{class: class-string<MigrationContract>, name: string, version: string}> */
     public function getPendingMigrations(): array
     {
         $pending = [];
@@ -296,8 +286,8 @@ class MigrationManager
             }
 
             $pending[] = [
-                'class' => $migration::class,
-                'name' => $this->extractClassName($migration::class),
+                'class'   => $migration::class,
+                'name'    => $this->extractClassName($migration::class),
                 'version' => $migration->getVersion(),
             ];
         }

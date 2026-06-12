@@ -6,14 +6,10 @@ namespace SymPress\WordPress\Migration\Domain;
 
 use SymPress\WordPress\Migration\Contract\Migration as MigrationContract;
 
-/**
- * @implements \IteratorAggregate<int, MigrationContract>
- */
+/** @implements \IteratorAggregate<int, MigrationContract> */
 final class MigrationCollection implements \Countable, \IteratorAggregate
 {
-    /**
-     * @param array<class-string<MigrationContract>, MigrationContract> $migrations
-     */
+    /** @param array<class-string<MigrationContract>, MigrationContract> $migrations */
     private function __construct(
         private array $migrations,
     ) {
@@ -25,9 +21,7 @@ final class MigrationCollection implements \Countable, \IteratorAggregate
         return new self([]);
     }
 
-    /**
-     * @param iterable<MigrationContract> $migrations
-     */
+    /** @param iterable<MigrationContract> $migrations */
     #[\NoDiscard]
     public static function fromIterable(iterable $migrations): self
     {
@@ -54,25 +48,19 @@ final class MigrationCollection implements \Countable, \IteratorAggregate
         return $this->migrations[$migrationClass] ?? null;
     }
 
-    /**
-     * @return array<class-string<MigrationContract>, MigrationContract>
-     */
+    /** @return array<class-string<MigrationContract>, MigrationContract> */
     public function all(): array
     {
         return $this->migrations;
     }
 
-    /**
-     * @return list<MigrationContract>
-     */
+    /** @return list<MigrationContract> */
     public function inRegistrationOrder(): array
     {
         return array_values($this->migrations);
     }
 
-    /**
-     * @return list<MigrationContract>
-     */
+    /** @return list<MigrationContract> */
     public function inRollbackOrder(): array
     {
         return array_values(array_reverse($this->migrations, true));
