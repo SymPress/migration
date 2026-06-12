@@ -89,9 +89,7 @@ final readonly class MigrationLifecycle
         );
     }
 
-    /**
-     * @return list<MigrationRecord>
-     */
+    /** @return list<MigrationRecord> */
     public function recordsForPlugin(PluginSlug $pluginSlug): array
     {
         return $this->store->findRecordsForPlugin($pluginSlug->value);
@@ -102,9 +100,7 @@ final readonly class MigrationLifecycle
         return $this->store->findRecord($pluginSlug->value, $migration::class);
     }
 
-    /**
-     * @return list<MigrationExecution>
-     */
+    /** @return list<MigrationExecution> */
     public function historyForPlugin(PluginSlug $pluginSlug): array
     {
         return $this->store->findHistoryForPlugin($pluginSlug->value);

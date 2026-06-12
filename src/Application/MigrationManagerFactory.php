@@ -15,9 +15,7 @@ final readonly class MigrationManagerFactory
     {
     }
 
-    /**
-     * @param iterable<MigrationContract> $migrations
-     */
+    /** @param iterable<MigrationContract> $migrations */
     #[\NoDiscard]
     public function create(string $pluginSlug, iterable $migrations = []): MigrationManager
     {

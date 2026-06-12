@@ -67,9 +67,9 @@ final readonly class MigrationStatusReporter
         }
 
         return [
-            'overview' => $this->overview($pluginSlug, $manager),
+            'overview'           => $this->overview($pluginSlug, $manager),
             'pending_migrations' => $manager->getPendingMigrations(),
-            'recent_history' => array_slice($this->historyRows($manager), 0, 10),
+            'recent_history'     => array_slice($this->historyRows($manager), 0, 10),
         ];
     }
 
@@ -90,13 +90,13 @@ final readonly class MigrationStatusReporter
         $latest = $manager->getLatestMigration();
 
         return [
-            'plugin' => $pluginSlug,
-            'current' => $current['version'] ?? 'none',
-            'latest' => $latest['version'] ?? 'none',
-            'migrated' => count($manager->getMigratedVersions()),
-            'pending' => count($manager->getPendingMigrations()),
+            'plugin'     => $pluginSlug,
+            'current'    => $current['version'] ?? 'none',
+            'latest'     => $latest['version'] ?? 'none',
+            'migrated'   => count($manager->getMigratedVersions()),
+            'pending'    => count($manager->getPendingMigrations()),
             'executions' => count($manager->getMigrationHistory()),
-            'status' => $manager->isUpToDate() ? 'Up to Date' : 'Pending',
+            'status'     => $manager->isUpToDate() ? 'Up to Date' : 'Pending',
         ];
     }
 
@@ -114,11 +114,11 @@ final readonly class MigrationStatusReporter
     {
         return array_map(
             fn (array $row): array => [
-                'plugin' => $row['plugin'],
-                'migration' => $row['migration'],
-                'name' => $this->extractClassName($row['migration']),
-                'version' => $row['version'],
-                'direction' => $row['direction'],
+                'plugin'      => $row['plugin'],
+                'migration'   => $row['migration'],
+                'name'        => $this->extractClassName($row['migration']),
+                'version'     => $row['version'],
+                'direction'   => $row['direction'],
                 'executed_at' => $row['executed_at'],
             ],
             $manager->getMigrationHistory(),

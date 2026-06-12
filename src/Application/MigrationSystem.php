@@ -74,9 +74,7 @@ final class MigrationSystem
         $this->registeredMigrations[$pluginSlugValue] = $collection->with($migration);
     }
 
-    /**
-     * @param iterable<MigrationContract> $migrations
-     */
+    /** @param iterable<MigrationContract> $migrations */
     public function registerMigrations(string $pluginSlug, iterable $migrations): void
     {
         foreach ($migrations as $migration) {
@@ -84,9 +82,7 @@ final class MigrationSystem
         }
     }
 
-    /**
-     * @return list<MigrationContract>
-     */
+    /** @return list<MigrationContract> */
     public function getMigrations(string $pluginSlug): array
     {
         $pluginSlugValue = PluginSlug::fromString($pluginSlug)->value;
