@@ -33,6 +33,7 @@ final class MigrationStatusCommand extends Command
     public function __construct(
         private readonly MigrationStatusReporter $reporter,
     ) {
+
         parent::__construct();
     }
 
@@ -77,6 +78,7 @@ final class MigrationStatusCommand extends Command
         InputInterface $input,
         OutputInterface $output,
     ): int {
+
         $report = $this->reporter->plugin($pluginSlug);
         $io = new SymfonyStyle($input, $output);
 
@@ -137,15 +139,18 @@ final class MigrationStatusCommand extends Command
     private function renderRows(OutputInterface $output, array $rows, array $headers, string $format): void
     {
         if ($format === 'table') {
+            $tableRows = [];
+
+            foreach ($rows as $row) {
+                $tableRows[] = array_map(
+                    static fn (string $header): mixed => $row[$header] ?? '',
+                    $headers,
+                );
+            }
+
             (new Table($output))
                 ->setHeaders($headers)
-                ->setRows(array_map(
-                    static fn (array $row): array => array_map(
-                        static fn (string $header): mixed => $row[$header] ?? '',
-                        $headers,
-                    ),
-                    $rows,
-                ))
+                ->setRows($tableRows)
                 ->render();
 
             return;
@@ -173,9 +178,7 @@ final class MigrationStatusCommand extends Command
         $this->renderCsv($output, $data);
     }
 
-    /**
-     * @param array<mixed> $data
-     */
+    /** @param array<mixed> $data */
     private function renderCsv(OutputInterface $output, array $data): void
     {
         $rows = array_is_list($data) ? $data : [$data];
@@ -217,9 +220,7 @@ final class MigrationStatusCommand extends Command
         ));
     }
 
-    /**
-     * @param list<string> $values
-     */
+    /** @param list<string> $values */
     private function csvLine(array $values): string
     {
         $handle = fopen('php://temp', 'r+');
@@ -228,7 +229,7 @@ final class MigrationStatusCommand extends Command
             return '';
         }
 
-        fputcsv($handle, $values);
+        fputcsv($handle, $values, ',', '"', '\\');
         rewind($handle);
         $line = stream_get_contents($handle);
         fclose($handle);
