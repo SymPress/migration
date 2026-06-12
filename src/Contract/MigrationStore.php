@@ -21,24 +21,16 @@ interface MigrationStore
 
     public function appendHistory(MigrationExecution $execution): bool;
 
-    /**
-     * @return list<MigrationRecord>
-     */
+    /** @return list<MigrationRecord> */
     public function findRecordsForPlugin(string $pluginSlug): array;
 
-    /**
-     * @return list<MigrationRecord>
-     */
+    /** @return list<MigrationRecord> */
     public function findAllRecords(): array;
 
-    /**
-     * @return list<MigrationExecution>
-     */
+    /** @return list<MigrationExecution> */
     public function findHistoryForPlugin(string $pluginSlug): array;
 
-    /**
-     * @return list<MigrationExecution>
-     */
+    /** @return list<MigrationExecution> */
     public function findAllHistory(): array;
 
     public function getVersion(string $pluginSlug, string $migrationClass): ?string;

@@ -6,8 +6,6 @@ namespace SymPress\WordPress\Migration\Contract;
 
 interface MigrationSqlExecutor
 {
-    /**
-     * @param string|list<string> $statements
-     */
+    /** @param string|list<string> $statements */
     public function execute(string|array $statements): bool;
 }
