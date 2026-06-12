@@ -20,7 +20,7 @@
         "mockery/mockery": "^1.6",
         "phpstan/phpstan": "^2.1",
         "friendsofphp/php-cs-fixer": "^3.94",
-        "inpsyde/php-coding-standards": "^2.0",
+        "sympress/coding-standards": "@dev",
         "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
         "brain/monkey": "^2",
         "symfony/var-dumper": "^7"
@@ -31,22 +31,26 @@
         }
     },
     "scripts": {
-        "test": "phpunit --no-coverage",
-        "test:unit": "phpunit --no-coverage --testsuite Unit",
-        "test:integration": "phpunit --no-coverage --testsuite Integration",
-        "test:coverage": "phpunit --coverage-html coverage-html",
-        "cs:analyze": "phpstan analyse -c phpstan.neon.dist --no-progress",
-        "cs:style": "php-cs-fixer fix --dry-run --diff --using-cache=no --config=.php-cs-fixer.dist.php",
-        "cs:style:fix": "php-cs-fixer fix --using-cache=no --config=.php-cs-fixer.dist.php",
-        "cs:audit": "phpcs --standard=phpcs.xml.dist",
-        "cs:audit:fix": "phpcbf --standard=phpcs.xml.dist",
         "cs": [
-            "@cs:style",
-            "@cs:audit"
+            "Composer\\Config::disableProcessTimeout",
+            "@php ../../bin/package-quality.php cs"
         ],
         "cs:fix": [
-            "@cs:style:fix",
-            "@cs:audit"
+            "Composer\\Config::disableProcessTimeout",
+            "@php ../../bin/package-quality.php cs:fix"
+        ],
+        "static-analysis": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php ../../bin/package-quality.php static-analysis"
+        ],
+        "tests": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php ../../bin/package-quality.php tests"
+        ],
+        "qa": [
+            "@cs",
+            "@static-analysis",
+            "@tests"
         ]
     },
     "config": {
@@ -72,5 +76,7 @@
             "bundle": "SymPress\\WordPress\\Migration\\MigrationBundle",
             "entry": "migration/migration.php"
         }
-    }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
 }

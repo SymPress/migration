@@ -2,7 +2,7 @@
 <ruleset name="Migration MU Plugin">
     <description>
         WordPress and security-focused coding standard audit for the migration MU plugin.
-        Auto-formatting stays in PHP CS Fixer; PHPCS enforces the Inpsyde standard.
+        Auto-formatting stays in PHP CS Fixer; PHPCS enforces the SymPress standard.
     </description>
 
     <arg name="colors"/>
@@ -27,14 +27,24 @@
     <exclude-pattern>src/Value/MigrationRecord.php</exclude-pattern>
     <exclude-pattern>src/Value/MigrationExecution.php</exclude-pattern>
 
-    <rule ref="Inpsyde">
+    <rule ref="SymPress-WordPress">
         <!-- PHP 8.5 property hooks are not parsed reliably by PHPCS yet. -->
-        <exclude name="Inpsyde.CodeQuality.NoAccessors"/>
+        <exclude name="SymPress.Classes.AccessorNaming"/>
         <exclude name="WordPress.PHP.DevelopmentFunctions.error_log_trigger_error"/>
         <exclude name="WordPress.PHP.POSIXFunctions"/>
+        <exclude name="SlevomatCodingStandard.Commenting.DocCommentSpacing.IncorrectLinesCountBetweenDifferentAnnotationsTypes" />
+        <exclude name="SlevomatCodingStandard.Commenting.InlineDocCommentDeclaration.MissingVariable" />
+        <exclude name="SlevomatCodingStandard.Commenting.RequireOneLineDocComment.MultiLineDocComment" />
+        <exclude name="SlevomatCodingStandard.Functions.UnusedParameter.UnusedParameter" />
+        <exclude name="SlevomatCodingStandard.Namespaces.ReferenceUsedNamesOnly.ReferenceViaFullyQualifiedName" />
+        <exclude name="SlevomatCodingStandard.Variables.DisallowSuperGlobalVariable.DisallowedSuperGlobalVariable" />
+        <exclude name="SymPress.Arrays.ArrayDoubleArrowAlignment.AssignmentsNotAligned" />
+        <exclude name="SymPress.Variables.RedundantAssignment.Found" />
+        <exclude name="WordPress.WP.AlternativeFunctions.file_system_operations_fclose" />
+        <exclude name="WordPress.WP.AlternativeFunctions.file_system_operations_fopen" />
     </rule>
 
-    <rule ref="Inpsyde.CodeQuality.Psr4">
+    <rule ref="SymPress.Namespaces.Psr4">
         <properties>
             <property name="psr4" type="array">
                 <element key="SymPress\WordPress\Migration" value="src"/>
