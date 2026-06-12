@@ -12,19 +12,10 @@ final class MigrationBootstrap
 {
     private static ?self $instance = null;
     private bool $initialized = false;
-    private readonly MigrationRegistry $registry;
-    /** @var class-string */
-    private string $commandClass;
-    private ?object $command;
 
-    /**
-     * @param class-string $commandClass
-     */
-    private function __construct(MigrationRegistry $registry, string $commandClass, ?object $command = null)
+    /** @param class-string $commandClass */
+    private function __construct(private readonly MigrationRegistry $registry, private string $commandClass, private ?object $command = null)
     {
-        $this->registry = $registry;
-        $this->commandClass = $commandClass;
-        $this->command = $command;
     }
 
     public static function getInstance(): self
@@ -32,9 +23,7 @@ final class MigrationBootstrap
         return self::bootstrap();
     }
 
-    /**
-     * @param class-string $commandClass
-     */
+    /** @param class-string $commandClass */
     public static function bootstrap(
         ?MigrationRegistry $registry = null,
         string $commandClass = MigrationCommand::class,
@@ -88,9 +77,7 @@ final class MigrationBootstrap
         add_action('db_migration_registered', [$this, 'syncMigrationsToRegistry'], 20, 1);
     }
 
-    /**
-     * @throws \Exception
-     */
+    /** @throws \Exception */
     private function registerCommands(): void
     {
         if ($this->command !== null) {
