@@ -35,6 +35,10 @@ final readonly class MigrationLifecycle
             return true;
         }
 
+        if ($this->isSchemaVersion($currentVersion) || $this->isSchemaVersion($migration->getVersion())) {
+            return $currentVersion !== $migration->getVersion();
+        }
+
         return version_compare($currentVersion, $migration->getVersion(), '<');
     }
 
@@ -186,5 +190,10 @@ final readonly class MigrationLifecycle
         }
 
         return gmdate('Y-m-d H:i:s');
+    }
+
+    private function isSchemaVersion(string $version): bool
+    {
+        return str_starts_with($version, 'schema:');
     }
 }

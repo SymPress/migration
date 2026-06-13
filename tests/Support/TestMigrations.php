@@ -48,3 +48,29 @@ final class AddCustomersEmailIndexMigration extends AbstractMigration
         );
     }
 }
+
+final class SchemaHashMigration extends AbstractMigration
+{
+    public function __construct(
+        ?\wpdb $database = null,
+        private readonly string $version = 'schema:0000000000000000',
+    ) {
+
+        parent::__construct($database);
+    }
+
+    public function getVersion(): string
+    {
+        return $this->version;
+    }
+
+    public function up(): string|array
+    {
+        return 'SELECT 1;';
+    }
+
+    public function down(): string|array
+    {
+        return 'SELECT 1;';
+    }
+}

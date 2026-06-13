@@ -70,6 +70,9 @@
             }
         }
     ],
+    "suggest": {
+        "sympress/orm": "Enables entity metadata driven schema migrations through the ORM bridge."
+    },
     "extra": {
         "wordpress-install-dir": "vendor/wordpress/wordpress",
         "kernel": {

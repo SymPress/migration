@@ -8,6 +8,7 @@ use SymPress\WordPress\Migration\Domain\MigrationManager;
 use SymPress\WordPress\Migration\Tests\Support\AddCustomersEmailIndexMigration;
 use SymPress\WordPress\Migration\Tests\Support\CreateCustomersTableMigration;
 use SymPress\WordPress\Migration\Tests\Support\CreatesMigrationManagers;
+use SymPress\WordPress\Migration\Tests\Support\SchemaHashMigration;
 use SymPress\WordPress\Migration\Tests\Support\WordPressState;
 use PHPUnit\Framework\TestCase;
 
@@ -110,6 +111,23 @@ final class MigrationManagerTest extends TestCase
             $this->manager->runMigration(CreateCustomersTableMigration::class),
         );
         self::assertSame([], $this->database->executedStatements);
+    }
+
+    public function test_schema_hash_versions_are_pending_when_the_hash_changes(): void
+    {
+        $manager = $this->createMigrationManager(
+            $this->database,
+            [new SchemaHashMigration($this->database, 'schema:ffffffffffffffff')],
+        );
+
+        self::assertTrue($manager->markMigration(SchemaHashMigration::class, 'up'));
+
+        $changedManager = $this->createMigrationManager(
+            $this->database,
+            [new SchemaHashMigration($this->database, 'schema:0000000000000000')],
+        );
+
+        self::assertTrue($changedManager->hasPendingMigrations());
     }
 
     public function test_it_can_mark_versions_without_executing_sql(): void
