@@ -33,19 +33,19 @@
     "scripts": {
         "cs": [
             "Composer\\Config::disableProcessTimeout",
-            "@php bin/package-quality.php cs"
+            "phpcs --standard=phpcs.xml.dist"
         ],
         "cs:fix": [
             "Composer\\Config::disableProcessTimeout",
-            "@php bin/package-quality.php cs:fix"
+            "phpcbf --standard=phpcs.xml.dist"
         ],
         "static-analysis": [
             "Composer\\Config::disableProcessTimeout",
-            "@php bin/package-quality.php static-analysis"
+            "phpstan analyse --memory-limit=1G --no-progress -c phpstan.neon.dist"
         ],
         "tests": [
             "Composer\\Config::disableProcessTimeout",
-            "@php bin/package-quality.php tests"
+            "phpunit --configuration phpunit.xml.dist --no-coverage"
         ],
         "qa": [
             "@cs",
