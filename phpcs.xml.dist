@@ -42,6 +42,7 @@
         <exclude name="SymPress.Variables.RedundantAssignment.Found" />
         <exclude name="WordPress.WP.AlternativeFunctions.file_system_operations_fclose" />
         <exclude name="WordPress.WP.AlternativeFunctions.file_system_operations_fopen" />
+        <exclude name="WordPress.WP.AlternativeFunctions.json_encode_json_encode" />
     </rule>
 
     <rule ref="SymPress.Namespaces.Psr4">
