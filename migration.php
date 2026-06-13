@@ -14,6 +14,11 @@ declare(strict_types=1);
 
 namespace SymPress\WordPress\Migration;
 
+use SymPress\WordPress\Migration\Application\MigrationSystem;
+use SymPress\WordPress\Migration\Cli\MigrationBootstrap;
+use SymPress\WordPress\Migration\Hook\MigrationCliBootstrap;
+use SymPress\WordPress\Migration\Hook\MigrationSystemBootstrap;
+
 if (!defined('ABSPATH')) {
     return;
 }
@@ -21,3 +26,11 @@ if (!defined('ABSPATH')) {
 if (!class_exists(MigrationBundle::class)) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
+
+add_action('kernel.add-providers', static function (): void {
+});
+
+add_action('muplugins_loaded', static function (): void {
+    (new MigrationSystemBootstrap(MigrationSystem::getInstance()))->initialize();
+    (new MigrationCliBootstrap(MigrationBootstrap::getInstance()))->initialize();
+}, 5);
