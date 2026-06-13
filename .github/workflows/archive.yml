@@ -1,0 +1,35 @@
+name: WordPress Archive
+
+on:
+  push:
+    tags:
+      - '*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version written to plugin headers.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  pull-requests: read
+
+jobs:
+  archive:
+    uses: sympress/workflows/.github/workflows/wordpress-archive.yml@v1
+    with:
+      main_file: migration.php
+      package_version: ${{ github.event.inputs.version }}
+    secrets:
+      COMPOSER_AUTH_JSON: ${{ secrets.COMPOSER_AUTH_JSON }}
+
+  archive-check:
+    needs: archive
+    uses: sympress/workflows/.github/workflows/wordpress-archive-check.yml@v1
+    with:
+      artifact_name: ${{ needs.archive.outputs.artifact }}
+    secrets:
+      COMPOSER_AUTH_JSON: ${{ secrets.COMPOSER_AUTH_JSON }}

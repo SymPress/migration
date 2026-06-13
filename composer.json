@@ -33,19 +33,19 @@
     "scripts": {
         "cs": [
             "Composer\\Config::disableProcessTimeout",
-            "@php ../../bin/package-quality.php cs"
+            "@php bin/package-quality.php cs"
         ],
         "cs:fix": [
             "Composer\\Config::disableProcessTimeout",
-            "@php ../../bin/package-quality.php cs:fix"
+            "@php bin/package-quality.php cs:fix"
         ],
         "static-analysis": [
             "Composer\\Config::disableProcessTimeout",
-            "@php ../../bin/package-quality.php static-analysis"
+            "@php bin/package-quality.php static-analysis"
         ],
         "tests": [
             "Composer\\Config::disableProcessTimeout",
-            "@php ../../bin/package-quality.php tests"
+            "@php bin/package-quality.php tests"
         ],
         "qa": [
             "@cs",

@@ -1,0 +1,22 @@
+name: QA
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  workflows:
+    uses: sympress/workflows/.github/workflows/lint-workflows.yml@v1
+
+  qa:
+    uses: sympress/workflows/.github/workflows/sympress-qa.yml@v1
+    with:
+      php_version: '8.5'
+    secrets:
+      COMPOSER_AUTH_JSON: ${{ secrets.COMPOSER_AUTH_JSON }}
