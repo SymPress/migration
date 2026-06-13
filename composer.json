@@ -12,7 +12,7 @@
     ],
     "require": {
         "php": "^8.5",
-        "sympress/kernel": "@dev",
+        "sympress/kernel": "dev-main",
         "symfony/console": "^8.0"
     },
     "require-dev": {
@@ -20,7 +20,7 @@
         "mockery/mockery": "^1.6",
         "phpstan/phpstan": "^2.1",
         "friendsofphp/php-cs-fixer": "^3.94",
-        "sympress/coding-standards": "@dev",
+        "sympress/coding-standards": "dev-main",
         "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
         "brain/monkey": "^2",
         "symfony/var-dumper": "^7"
