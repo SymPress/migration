@@ -1,5 +1,7 @@
 # Database Migration System
 
+[![Checks](https://img.shields.io/github/actions/workflow/status/SymPress/migration/qa.yml?branch=main&label=checks)](https://github.com/SymPress/migration/actions/workflows/qa.yml) [![Release](https://img.shields.io/packagist/v/sympress/migration.svg?label=release)](https://packagist.org/packages/sympress/migration) [![PHP](https://img.shields.io/packagist/dependency-v/sympress/migration/php.svg?label=php)](https://packagist.org/packages/sympress/migration) [![Downloads](https://img.shields.io/packagist/dt/sympress/migration.svg?label=downloads)](https://packagist.org/packages/sympress/migration/stats) [![License: GPL-2.0-or-later](https://img.shields.io/badge/license-GPL--2.0--or--later-blue.svg)](LICENSE)
+
 Standalone WordPress MU-plugin for versioned database migrations with Doctrine-style runtime and metadata management.
 
 ## Requirements
