@@ -8,4 +8,11 @@ where applicable.
 
 ## Unreleased
 
-- Initial SymPress Migration package documentation.
+### Changed
+
+- Split WP-CLI migration command execution and reporting into focused collaborators.
+- Adopt shared SymPress QA tooling for package scripts and development dependencies.
+
+### Fixed
+
+- Cover rollback behavior when a migration fails during reverse execution.

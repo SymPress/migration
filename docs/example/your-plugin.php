@@ -6,7 +6,7 @@
  * Plugin Name: Your Plugin
  * Description: Example plugin using the migration system
  * Version: 1.0.0
- * Requires PHP: 8.2
+ * Requires PHP: 8.5
  */
 
 declare(strict_types=1);
