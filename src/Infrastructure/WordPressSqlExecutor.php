@@ -62,7 +62,7 @@ final readonly class WordPressSqlExecutor implements MigrationSqlExecutor
 
         $absolutePath = constant('ABSPATH');
 
-        if (!is_string($absolutePath) || $absolutePath === '') {
+        if ($absolutePath === '') {
             throw new \RuntimeException('ABSPATH must be a non-empty string.');
         }
 

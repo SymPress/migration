@@ -257,8 +257,9 @@ final readonly class MigrationCommandReporter
     {
         $report = $this->statusReporter()->plugin($pluginSlug);
 
-        if (!is_array($report)) {
+        if ($report === null) {
             $this->context->managerOrFail($pluginSlug);
+            return;
         }
 
         $overview = $report['overview'];

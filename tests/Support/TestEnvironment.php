@@ -92,10 +92,21 @@ namespace {
 
             public function prepare(string $query, mixed ...$args): string
             {
-                $query = str_replace(['%d', '%f'], '%s', $query);
-                $preparedArgs = array_map([$this, 'prepareValue'], $args);
+                $index = 0;
 
-                return vsprintf($query, $preparedArgs);
+                return (string) preg_replace_callback(
+                    '/(?<!%)%([dfis])/',
+                    function (array $matches) use ($args, &$index): string {
+                        $value = $args[$index++] ?? '';
+
+                        if ($matches[1] === 'i') {
+                            return $this->prepareIdentifier($value);
+                        }
+
+                        return $this->prepareValue($value);
+                    },
+                    $query,
+                );
             }
 
             public function get_var(string $query): string|int|null
@@ -104,7 +115,12 @@ namespace {
                     return $this->hasTable($matches[1]) ? $matches[1] : null;
                 }
 
-                if (preg_match("/^SELECT COUNT\\(\\*\\) FROM ([a-zA-Z0-9_]+)(?: WHERE plugin = '([^']+)')?$/i", trim($query), $matches) !== 1) {
+                if (preg_match(
+                    '/^SELECT COUNT\\(\\*\\) FROM `?([a-zA-Z0-9_]+)`?'
+                    . "(?: WHERE plugin = '([^']+)')?$/i",
+                    trim($query),
+                    $matches,
+                ) !== 1) {
                     return null;
                 }
 
@@ -130,7 +146,7 @@ namespace {
             public function get_row(string $query, string|int $output = ARRAY_A): ?array
             {
                 if (preg_match(
-                    "/FROM ([a-zA-Z0-9_]+)\s+WHERE plugin = '([^']+)' AND migration = '([^']+)'/i",
+                    "/FROM `?([a-zA-Z0-9_]+)`?\s+WHERE plugin = '([^']+)' AND migration = '([^']+)'/i",
                     $query,
                     $matches,
                 ) !== 1) {
@@ -149,7 +165,7 @@ namespace {
             public function get_results(string $query, string|int $output = ARRAY_A): ?array
             {
                 if (preg_match(
-                    "/FROM ([a-zA-Z0-9_]+)\s+WHERE plugin = '([^']+)'\s+ORDER BY id ASC/i",
+                    "/FROM `?([a-zA-Z0-9_]+)`?\s+WHERE plugin = '([^']+)'\s+ORDER BY id ASC/i",
                     $query,
                     $matches,
                 ) === 1) {
@@ -171,7 +187,7 @@ namespace {
                 }
 
                 if (preg_match(
-                    "/FROM ([a-zA-Z0-9_]+)\s+WHERE plugin = '([^']+)'\s+ORDER BY id DESC/i",
+                    "/FROM `?([a-zA-Z0-9_]+)`?\s+WHERE plugin = '([^']+)'\s+ORDER BY id DESC/i",
                     $query,
                     $matches,
                 ) === 1) {
@@ -193,7 +209,7 @@ namespace {
                 }
 
                 if (preg_match(
-                    "/FROM ([a-zA-Z0-9_]+)\s+ORDER BY id DESC/i",
+                    "/FROM `?([a-zA-Z0-9_]+)`?\s+ORDER BY id DESC/i",
                     $query,
                     $matches,
                 ) === 1) {
@@ -212,7 +228,7 @@ namespace {
                 }
 
                 if (preg_match(
-                    "/FROM ([a-zA-Z0-9_]+)\s+ORDER BY plugin ASC, id ASC/i",
+                    "/FROM `?([a-zA-Z0-9_]+)`?\s+ORDER BY plugin ASC, id ASC/i",
                     $query,
                     $matches,
                 ) !== 1) {
@@ -401,6 +417,11 @@ namespace {
                 }
 
                 return sprintf("'%s'", str_replace("'", "\\'", (string) $value));
+            }
+
+            private function prepareIdentifier(mixed $value): string
+            {
+                return sprintf('`%s`', str_replace('`', '``', (string) $value));
             }
 
             private function recordKey(string $plugin, string $migration): string
