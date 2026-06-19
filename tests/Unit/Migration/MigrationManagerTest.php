@@ -90,6 +90,25 @@ final class MigrationManagerTest extends TestCase
         self::assertCount(4, $this->manager->getMigrationHistory());
     }
 
+    public function test_it_stops_rollback_when_a_migration_fails(): void
+    {
+        $this->manager->runMigrations();
+        $this->database->executedStatements = [];
+        $this->database->failedStatements[] = 'ALTER TABLE wp_customers DROP INDEX idx_email;';
+
+        self::assertFalse($this->manager->rollbackMigrations());
+        self::assertSame(
+            ['ALTER TABLE wp_customers DROP INDEX idx_email;'],
+            $this->database->executedStatements,
+        );
+        self::assertCount(2, $this->manager->getMigratedVersions());
+        self::assertSame(
+            AddCustomersEmailIndexMigration::class,
+            $this->manager->getCurrentMigration()['class'],
+        );
+        self::assertCount(2, $this->manager->getMigrationHistory());
+    }
+
     public function test_it_stops_when_a_migration_fails(): void
     {
         $this->database->failedStatements[] = 'ALTER TABLE wp_customers ADD INDEX idx_email (email);';
