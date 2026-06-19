@@ -168,9 +168,10 @@ final class MigrationTracker implements MigrationStore
         }
 
         $query = $this->database->prepare(
-            "SELECT plugin, migration, version, migrated_at
-            FROM {$this->tableName}
+            'SELECT plugin, migration, version, migrated_at
+            FROM %i
             WHERE plugin = %s AND migration = %s",
+            $this->tableName,
             $plugin,
             $migrationName,
         );
@@ -214,10 +215,11 @@ final class MigrationTracker implements MigrationStore
         }
 
         $query = $this->database->prepare(
-            "SELECT plugin, migration, version, migrated_at
-            FROM {$this->tableName}
+            'SELECT plugin, migration, version, migrated_at
+            FROM %i
             WHERE plugin = %s
-            ORDER BY id ASC",
+            ORDER BY id ASC',
+            $this->tableName,
             $plugin,
         );
 
@@ -269,7 +271,8 @@ final class MigrationTracker implements MigrationStore
         }
 
         $query = $this->database->prepare(
-            "SELECT COUNT(*) FROM {$this->tableName} WHERE plugin = %s",
+            'SELECT COUNT(*) FROM %i WHERE plugin = %s',
+            $this->tableName,
             $plugin,
         );
 
@@ -327,10 +330,11 @@ final class MigrationTracker implements MigrationStore
         }
 
         $query = $this->database->prepare(
-            "SELECT plugin, migration, version, direction, executed_at
-            FROM {$this->historyTableName}
+            'SELECT plugin, migration, version, direction, executed_at
+            FROM %i
             WHERE plugin = %s
-            ORDER BY id DESC",
+            ORDER BY id DESC',
+            $this->historyTableName,
             $pluginSlug,
         );
 
@@ -471,7 +475,7 @@ final class MigrationTracker implements MigrationStore
 
         $absolutePath = constant('ABSPATH');
 
-        if (!is_string($absolutePath) || $absolutePath === '') {
+        if ($absolutePath === '') {
             throw new \RuntimeException('ABSPATH must be a non-empty string.');
         }
 
