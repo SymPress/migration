@@ -170,7 +170,7 @@ final class MigrationTracker implements MigrationStore
         $query = $this->database->prepare(
             'SELECT plugin, migration, version, migrated_at
             FROM %i
-            WHERE plugin = %s AND migration = %s",
+            WHERE plugin = %s AND migration = %s',
             $this->tableName,
             $plugin,
             $migrationName,
