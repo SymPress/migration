@@ -18,6 +18,7 @@
     "require-dev": {
         "brain/monkey": "^2",
         "friendsofphp/php-cs-fixer": "^3.94",
+        "johnpbloch/wordpress": "^7.0",
         "mockery/mockery": "^1.6",
         "symfony/var-dumper": "^8.1",
         "sympress/qa": "dev-main"
@@ -44,6 +45,10 @@
             "Composer\\Config::disableProcessTimeout",
             "qa tests"
         ],
+        "tests:database": [
+            "Composer\\Config::disableProcessTimeout",
+            "phpunit -c phpunit.database.xml.dist"
+        ],
         "test": [
             "@tests"
         ],
@@ -59,6 +64,7 @@
         "preferred-install": "dist",
         "allow-plugins": {
             "dealerdirect/phpcodesniffer-composer-installer": true,
+            "johnpbloch/wordpress-core-installer": true,
             "phpstan/extension-installer": true
         }
     },

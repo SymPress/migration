@@ -108,6 +108,9 @@ This gives you a persistent history for:
 
 `sync-metadata-storage` creates both tables. Auto-cleanup only removes them when explicitly enabled and when both current state and history are empty.
 
+See [`docs/architecture.md`](docs/architecture.md) for the ordered lifecycle,
+state/history model, failure boundary, and SQL executor contract.
+
 ## SQL Execution Rules
 
 - `CREATE TABLE` statements run through `dbDelta()`.
@@ -198,11 +201,7 @@ $pending = $manager->getPendingMigrations();
 ## Development
 
 ```bash
-composer test
-composer phpstan
-composer cs:style
-composer cs:audit
-composer cs
+composer qa
 composer cs:fix
 composer validate --strict
 ```
