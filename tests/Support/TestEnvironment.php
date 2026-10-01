@@ -109,10 +109,23 @@ namespace {
                 );
             }
 
+            public function esc_like(string $value): string
+            {
+                return addcslashes($value, '_%\\');
+            }
+
             public function get_var(string $query): string|int|null
             {
+                if (str_starts_with($query, 'SELECT GET_LOCK(') || str_starts_with($query, 'SELECT RELEASE_LOCK(')) {
+                    return 1;
+                }
+
+                if ($query === 'SELECT DATABASE()') {
+                    return 'disposable';
+                }
+
                 if (preg_match("/^SHOW TABLES LIKE '([^']+)'$/i", trim($query), $matches) === 1) {
-                    return $this->hasTable($matches[1]) ? $matches[1] : null;
+                    return $this->hasTable(stripslashes($matches[1])) ? stripslashes($matches[1]) : null;
                 }
 
                 if (preg_match(

@@ -21,7 +21,7 @@ or short class name. Processing stops on the first failed step.
 ## State model
 
 - `{$wpdb->prefix}migrations` contains the current version for each
-  `(plugin, migration class)` pair.
+  `(plugin, stable migration key)` pair.
 - `{$wpdb->prefix}migration_history` is append-only execution history; newest
   entries are returned first.
 - A `schema:<hash>` version changes on any unequal hash. Other versions use
@@ -30,10 +30,16 @@ or short class name. Processing stops on the first failed step.
 - Metadata tables are removed only when auto-cleanup is explicitly enabled and
   no current records remain.
 
-There is no transaction spanning migration SQL, current state, and history.
-Consequently, a metadata failure after successful SQL can leave database and
-metadata state different. Do not reorder these writes or add retry behavior
-without defining and testing the recovery contract.
+The WordPress executor holds a database advisory lock around each actual
+operation, rechecks applied state after acquiring it, and releases it in a
+`finally` block. The lock includes database, WordPress prefix and plugin scope.
+DML-only operations use a transaction spanning SQL, state and history on
+transactional tables. State/history writes also use a transaction after DDL.
+MySQL/MariaDB DDL can commit independently and is never claimed to be atomic.
+A DDL or metadata failure returns false, stops ordering and emits a credential
+free reconciliation warning; previously executed DDL may remain. Reconcile the
+schema before retrying. Custom SQL executors must implement
+`MigrationOperationExecutor` to provide the equivalent operation boundary.
 
 ## SQL executor contract
 
@@ -53,3 +59,25 @@ against a disposable MariaDB database and probes `dbDelta()`, ordinary queries,
 schema changes, current state, and append-only history through the real `wpdb`
 implementation. Run it for every database-boundary or schema-engine-specific
 change.
+
+## Identity, deployment and table scoping
+
+Named migration classes keep their class identity. Anonymous migration keys drop
+the absolute release directory and retain source basename plus declaration line;
+existing applied class records are found through the same normalization and are
+preserved. Anonymous migrations whose source declaration moves should expose a
+stable `getMigrationKey(): string`; explicit keys must be non-empty and fit 255
+bytes. The ORM bridge uses `orm-schema:<manager>` so its identity also survives
+source edits. Versions remain separate from keys.
+
+Default state/history tables use the current site's `$wpdb->prefix`, including
+its multisite blog prefix. A custom state table produces `<state_table>_history`
+as the matching history table. MigrationSystem initialization only registers
+hooks; it no longer probes/creates metadata tables on each admin request.
+Storage is initialized explicitly before migration or mark operations. LIKE
+table lookup escapes wildcard characters. Auto-cleanup remains opt-in.
+
+The WordPress PHPStan profile checks metadata queries, which use direct prepared
+constant templates with `%i` identifiers and bound values. The executor has one
+reasoned `sympress.preparedSql` suppression for the explicit trusted migration
+SQL contract. Custom metadata table identifiers are validated before DDL.

@@ -24,7 +24,15 @@ final class MigrationTracker implements MigrationStore
     public function __construct(private readonly \wpdb $database, ?string $tableName = null)
     {
         $this->tableName = $tableName ?? $database->prefix . self::TABLE_NAME;
-        $this->historyTableName = $database->prefix . self::HISTORY_TABLE_NAME;
+        $this->historyTableName = $tableName === null
+            ? $database->prefix . self::HISTORY_TABLE_NAME
+            : $tableName . '_history';
+
+        foreach ([$this->tableName, $this->historyTableName] as $identifier) {
+            if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $identifier) !== 1) {
+                throw new \InvalidArgumentException('Migration table names must be SQL identifiers.');
+            }
+        }
     }
 
     #[\Override]
@@ -167,16 +175,14 @@ final class MigrationTracker implements MigrationStore
             return null;
         }
 
-        $query = $this->database->prepare(
+        $result = $this->database->get_row($this->database->prepare(
             'SELECT plugin, migration, version, migrated_at
             FROM %i
             WHERE plugin = %s AND migration = %s',
             $this->tableName,
             $plugin,
             $migrationName,
-        );
-
-        $result = $this->database->get_row($query, ARRAY_A);
+        ), ARRAY_A);
 
         if (!is_array($result)) {
             return null;
@@ -214,16 +220,14 @@ final class MigrationTracker implements MigrationStore
             return [];
         }
 
-        $query = $this->database->prepare(
+        $results = $this->database->get_results($this->database->prepare(
             'SELECT plugin, migration, version, migrated_at
             FROM %i
             WHERE plugin = %s
             ORDER BY id ASC',
             $this->tableName,
             $plugin,
-        );
-
-        $results = $this->database->get_results($query, ARRAY_A);
+        ), ARRAY_A);
 
         if (!is_array($results)) {
             return [];
@@ -250,10 +254,10 @@ final class MigrationTracker implements MigrationStore
             return [];
         }
 
-        $query = "SELECT plugin, migration, version, migrated_at
-        FROM {$this->tableName}
-        ORDER BY plugin ASC, id ASC";
-        $results = $this->database->get_results($query, ARRAY_A);
+        $results = $this->database->get_results($this->database->prepare(
+            'SELECT plugin, migration, version, migrated_at FROM %i ORDER BY plugin ASC, id ASC',
+            $this->tableName,
+        ), ARRAY_A);
 
         if (!is_array($results)) {
             return [];
@@ -270,13 +274,11 @@ final class MigrationTracker implements MigrationStore
             return false;
         }
 
-        $query = $this->database->prepare(
+        $count = $this->database->get_var($this->database->prepare(
             'SELECT COUNT(*) FROM %i WHERE plugin = %s',
             $this->tableName,
             $plugin,
-        );
-
-        $count = $this->database->get_var($query);
+        ));
 
         return (int) $count > 0;
     }
@@ -288,8 +290,7 @@ final class MigrationTracker implements MigrationStore
             return false;
         }
 
-        $query = "SELECT COUNT(*) FROM {$this->tableName}";
-        $count = $this->database->get_var($query);
+        $count = $this->database->get_var($this->database->prepare('SELECT COUNT(*) FROM %i', $this->tableName));
 
         return (int) $count > 0;
     }
@@ -329,16 +330,14 @@ final class MigrationTracker implements MigrationStore
             return [];
         }
 
-        $query = $this->database->prepare(
+        $results = $this->database->get_results($this->database->prepare(
             'SELECT plugin, migration, version, direction, executed_at
             FROM %i
             WHERE plugin = %s
             ORDER BY id DESC',
             $this->historyTableName,
             $pluginSlug,
-        );
-
-        $results = $this->database->get_results($query, ARRAY_A);
+        ), ARRAY_A);
 
         if (!is_array($results)) {
             return [];
@@ -356,10 +355,10 @@ final class MigrationTracker implements MigrationStore
             return [];
         }
 
-        $query = "SELECT plugin, migration, version, direction, executed_at
-        FROM {$this->historyTableName}
-        ORDER BY id DESC";
-        $results = $this->database->get_results($query, ARRAY_A);
+        $results = $this->database->get_results($this->database->prepare(
+            'SELECT plugin, migration, version, direction, executed_at FROM %i ORDER BY id DESC',
+            $this->historyTableName,
+        ), ARRAY_A);
 
         if (!is_array($results)) {
             return [];
@@ -435,8 +434,8 @@ final class MigrationTracker implements MigrationStore
             return true;
         }
 
-        $query = "DROP TABLE IF EXISTS {$this->tableName}";
-        $result = $this->database->query($query);
+        // @phpstan-ignore argument.type (Nonempty constant template with a validated table identifier always produces SQL.)
+        $result = $this->database->query($this->database->prepare('DROP TABLE IF EXISTS %i', $this->tableName));
 
         if ($result !== false) {
             $this->tableCreated = false;
@@ -452,8 +451,8 @@ final class MigrationTracker implements MigrationStore
             return true;
         }
 
-        $query = "DROP TABLE IF EXISTS {$this->historyTableName}";
-        $result = $this->database->query($query);
+        // @phpstan-ignore argument.type (Nonempty constant template with a validated table identifier always produces SQL.)
+        $result = $this->database->query($this->database->prepare('DROP TABLE IF EXISTS %i', $this->historyTableName));
 
         if ($result !== false) {
             $this->historyTableCreated = false;
@@ -585,12 +584,10 @@ final class MigrationTracker implements MigrationStore
 
     private function queryTableExists(string $tableName): bool
     {
-        $query = $this->database->prepare(
+        $result = $this->database->get_var($this->database->prepare(
             'SHOW TABLES LIKE %s',
-            $tableName,
-        );
-
-        $result = $this->database->get_var($query);
+            $this->database->esc_like($tableName),
+        ));
 
         return $result === $tableName;
     }
@@ -622,8 +619,7 @@ final class MigrationTracker implements MigrationStore
             return false;
         }
 
-        $query = "SELECT COUNT(*) FROM {$this->historyTableName}";
-        $count = $this->database->get_var($query);
+        $count = $this->database->get_var($this->database->prepare('SELECT COUNT(*) FROM %i', $this->historyTableName));
 
         return (int) $count > 0;
     }

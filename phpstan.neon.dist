@@ -1,3 +1,6 @@
+includes:
+    - vendor/sympress/qa/config/phpstan/wordpress.neon
+
 parameters:
     level: max
     paths:
