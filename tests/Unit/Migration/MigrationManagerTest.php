@@ -83,7 +83,7 @@ final class MigrationManagerTest extends TestCase
         );
         self::assertSame(
             'DROP TABLE IF EXISTS wp_customers;',
-            $this->database->executedStatements[1],
+            $this->database->executedStatements[3],
         );
         self::assertSame([], $this->manager->getMigratedVersions());
         self::assertSame('down', $this->manager->getMigrationHistory()[0]['direction']);
@@ -159,5 +159,21 @@ final class MigrationManagerTest extends TestCase
         self::assertTrue($this->manager->markMigration(CreateCustomersTableMigration::class, 'down'));
         self::assertSame([], $this->manager->getMigratedVersions());
         self::assertSame('mark_down', $this->manager->getMigrationHistory()[0]['direction']);
+    }
+    public function testAnonymousRecordsSurviveChangedReleaseDirectory(): void
+    {
+        $migration = new class implements \SymPress\WordPress\Migration\Contract\Migration {
+            public function getVersion(): string { return '1.0.0'; }
+            public function up(): string { return 'SELECT should_not_run'; }
+            public function down(): string { return ''; }
+        };
+        $legacyClass = str_replace(__DIR__, '/old/releases/2025/tests', $migration::class);
+        $tracker = new \SymPress\WordPress\Migration\Infrastructure\MigrationTracker($this->database);
+        self::assertTrue($tracker->record('my-plugin', $legacyClass, '1.0.0'));
+        $manager = $this->createMigrationManager($this->database, [$migration]);
+        self::assertFalse($manager->needsUpdate($migration::class));
+        self::assertTrue($manager->runMigrations());
+        self::assertCount(1, $manager->getMigratedVersions());
+        self::assertSame($legacyClass, $manager->getMigratedVersions()[0]['migration']);
     }
 }

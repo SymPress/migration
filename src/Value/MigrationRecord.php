@@ -40,7 +40,7 @@ final class MigrationRecord
     }
 
     /**
-     * @param array{plugin?: mixed, migration?: mixed, version?: mixed, migrated_at?: mixed} $record
+     * @param array<array-key, mixed> $record
      */
     public static function fromDatabaseRow(array $record): self
     {

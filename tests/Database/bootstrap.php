@@ -13,7 +13,7 @@ if (!is_file($wordpressPath . 'wp-settings.php')) {
 $environment = static function (string $name, string $default): string {
     $value = getenv($name);
 
-    return $value === false || $value === '' ? $default : $value;
+    return $value === false ? $default : $value;
 };
 
 $_SERVER['HTTP_HOST'] = 'localhost';

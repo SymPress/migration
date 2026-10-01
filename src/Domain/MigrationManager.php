@@ -124,7 +124,7 @@ class MigrationManager
         $currentIndex = $this->currentMigrationIndex();
 
         if ($currentIndex === $targetIndex) {
-            return true;
+            return $this->migrateForward(0, $targetIndex);
         }
 
         if ($currentIndex < $targetIndex) {

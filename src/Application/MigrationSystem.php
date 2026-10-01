@@ -61,7 +61,6 @@ final class MigrationSystem
             return;
         }
 
-        $this->ensureMigrationTableExists();
         $this->registerHooks();
         $this->initialized = true;
     }
@@ -154,11 +153,6 @@ final class MigrationSystem
     public function dispatchRegisteredHook(): void
     {
         do_action('db_migration_registered', $this);
-    }
-
-    private function ensureMigrationTableExists(): void
-    {
-        $this->getTracker()->ensureTableExists();
     }
 
     private function registerHooks(): void

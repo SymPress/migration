@@ -47,13 +47,7 @@ final class MigrationExecution
     }
 
     /**
-     * @param array{
-     *     plugin?: mixed,
-     *     migration?: mixed,
-     *     version?: mixed,
-     *     direction?: mixed,
-     *     executed_at?: mixed
-     * } $record
+     * @param array<array-key, mixed> $record
      */
     public static function fromDatabaseRow(array $record): self
     {

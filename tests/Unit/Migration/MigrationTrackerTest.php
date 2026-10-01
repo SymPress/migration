@@ -25,6 +25,12 @@ final class MigrationTrackerTest extends TestCase
         $this->tracker = new MigrationTracker($this->database);
     }
 
+    public function testRejectsUnsafeTableIdentifiers(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new MigrationTracker($this->database, 'wp_migrations; DROP TABLE wp_users');
+    }
+
     public function test_it_creates_state_and_history_tables_once(): void
     {
         self::assertFalse($this->database->hasTable('wp_migrations'));
