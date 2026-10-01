@@ -58,6 +58,25 @@ final class MigrationCollection implements \Countable, \IteratorAggregate
         return new self($migrations);
     }
 
+    #[\NoDiscard]
+    public function replace(MigrationContract $migration): self
+    {
+        $key = MigrationKey::forMigration($migration);
+
+        if (!isset($this->migrations[$key])) {
+            throw new \InvalidArgumentException('Cannot replace an unregistered migration key.');
+        }
+
+        $others = $this->migrations;
+        unset($others[$key]);
+        // Validate every replacement identity against the other registrations.
+        $replacement = (new self($others))->with($migration)->all()[$key];
+        $migrations = $this->migrations;
+        $migrations[$key] = $replacement;
+
+        return new self($migrations);
+    }
+
     public function get(string $migrationClass): ?MigrationContract
     {
         if (isset($this->migrations[$migrationClass])) {

@@ -36,6 +36,13 @@ class MigrationManager
         return $this;
     }
 
+    public function replaceMigration(MigrationContract $migration): self
+    {
+        $this->migrations = $this->migrations->replace($migration);
+
+        return $this;
+    }
+
     /** @param iterable<MigrationContract> $migrations */
     public function registerMigrations(iterable $migrations): self
     {

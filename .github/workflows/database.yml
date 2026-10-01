@@ -1,0 +1,46 @@
+name: Database integration
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '29 2 * * 3'
+
+permissions:
+  contents: read
+
+jobs:
+  database:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      database:
+        image: mariadb:11.8@sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68
+        env:
+          MARIADB_ROOT_PASSWORD: sympress-database-test-only
+          MARIADB_DATABASE: sympress_review_migration
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    env:
+      CI: 'true'
+      WORDPRESS_DB_NAME: sympress_review_migration
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: sympress-database-test-only
+      WORDPRESS_DB_HOST: 127.0.0.1:3306
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.5'
+          extensions: mysqli, mbstring, dom, xml
+          tools: composer:2.10.3
+          coverage: none
+      - run: composer install --no-interaction --no-scripts
+      - run: composer qa
+      - run: composer tests:database -- --fail-on-skipped --fail-on-incomplete
