@@ -7,6 +7,7 @@ namespace SymPress\WordPress\Migration\Domain;
 use SymPress\WordPress\Migration\Application\MigrationLifecycle;
 use SymPress\WordPress\Migration\Contract\Migration as MigrationContract;
 use SymPress\WordPress\Migration\Value\MigrationExecution;
+use SymPress\WordPress\Migration\Value\MigrationKey;
 use SymPress\WordPress\Migration\Value\MigrationRecord;
 use SymPress\WordPress\Migration\Value\PluginSlug;
 
@@ -45,7 +46,7 @@ class MigrationManager
         return $this;
     }
 
-    /** @return array<class-string<MigrationContract>, MigrationContract> */
+    /** @return array<string, MigrationContract> */
     public function all(): array
     {
         return $this->migrations->all();
@@ -58,6 +59,7 @@ class MigrationManager
 
     public function runMigration(string $migrationClass): bool
     {
+        $this->assertLegacyIdentitiesAreMapped();
         $migration = $this->getMigration($migrationClass);
 
         if ($migration === null) {
@@ -77,6 +79,7 @@ class MigrationManager
 
     public function rollbackMigrations(): bool
     {
+        $this->assertLegacyIdentitiesAreMapped();
         foreach ($this->migrations->inRollbackOrder() as $migration) {
             if (!$this->lifecycle->hasBeenMigrated($this->pluginSlug, $migration)) {
                 continue;
@@ -92,6 +95,7 @@ class MigrationManager
 
     public function rollbackMigration(string $migrationClass): bool
     {
+        $this->assertLegacyIdentitiesAreMapped();
         $migration = $this->getMigration($migrationClass);
 
         if ($migration === null) {
@@ -107,6 +111,7 @@ class MigrationManager
 
     public function migrateTo(?string $targetVersion = null): bool
     {
+        $this->assertLegacyIdentitiesAreMapped();
         if (!$this->lifecycle->ensureStorageIsReady()) {
             return false;
         }
@@ -123,12 +128,8 @@ class MigrationManager
 
         $currentIndex = $this->currentMigrationIndex();
 
-        if ($currentIndex === $targetIndex) {
+        if ($currentIndex <= $targetIndex) {
             return $this->migrateForward(0, $targetIndex);
-        }
-
-        if ($currentIndex < $targetIndex) {
-            return $this->migrateForward($currentIndex + 1, $targetIndex);
         }
 
         return $this->rollbackBackward($currentIndex, $targetIndex + 1);
@@ -149,6 +150,7 @@ class MigrationManager
 
     public function markMigration(string $migrationClass, string $direction): bool
     {
+        $this->assertLegacyIdentitiesAreMapped();
         $migration = $this->getMigration($migrationClass);
 
         if ($migration === null) {
@@ -303,15 +305,16 @@ class MigrationManager
             return $migration;
         }
 
-        foreach ($this->migrations->inRegistrationOrder() as $registeredMigration) {
-            if ($this->extractClassName($registeredMigration::class) !== $migrationClass) {
-                continue;
-            }
+        $matches = array_filter(
+            $this->migrations->inRegistrationOrder(),
+            fn (MigrationContract $registered): bool => $this->extractClassName($registered::class) === $migrationClass,
+        );
 
-            return $registeredMigration;
+        if (count($matches) > 1) {
+            throw new \InvalidArgumentException('Ambiguous migration name; use its explicit stable key.');
         }
 
-        return null;
+        return array_first($matches);
     }
 
     private function currentMigrationIndex(): int
@@ -336,20 +339,47 @@ class MigrationManager
         }
 
         foreach ($this->migrations->inRegistrationOrder() as $index => $migration) {
-            if ($migration->getVersion() === $targetVersion) {
-                return $index;
-            }
-
-            if ($migration::class === $targetVersion) {
-                return $index;
-            }
-
-            if ($this->extractClassName($migration::class) === $targetVersion) {
+            if (MigrationKey::forMigration($migration) === $targetVersion) {
                 return $index;
             }
         }
 
-        return null;
+        $matches = [];
+
+        foreach ($this->migrations->inRegistrationOrder() as $index => $migration) {
+            if (
+                $migration->getVersion() !== $targetVersion && $migration::class !== $targetVersion
+                && $this->extractClassName($migration::class) !== $targetVersion
+            ) {
+                continue;
+            }
+
+            $matches[] = $index;
+        }
+
+        if (count($matches) > 1) {
+            throw new \InvalidArgumentException('Ambiguous migration target; use its explicit stable key.');
+        }
+
+        return array_first($matches);
+    }
+
+    private function assertLegacyIdentitiesAreMapped(): void
+    {
+        $known = [];
+
+        foreach ($this->migrations as $migration) {
+            foreach (MigrationKey::identities($migration) as $identity) {
+                $known[$identity] = true;
+            }
+        }
+
+        foreach ($this->lifecycle->recordsForPlugin($this->pluginSlug) as $record) {
+            if (str_contains($record->migration, '@anonymous') && !isset($known[$record->migration])) {
+                throw new \RuntimeException('Unmapped legacy anonymous migration state. '
+                    . 'Supply its exact recorded identity in getLegacyMigrationKeys() before executing migrations.');
+            }
+        }
     }
 
     private function migrateForward(int $startIndex, int $targetIndex): bool

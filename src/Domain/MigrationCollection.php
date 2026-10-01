@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace SymPress\WordPress\Migration\Domain;
 
 use SymPress\WordPress\Migration\Contract\Migration as MigrationContract;
+use SymPress\WordPress\Migration\Value\MigrationKey;
 
 /** @implements \IteratorAggregate<int, MigrationContract> */
 final class MigrationCollection implements \Countable, \IteratorAggregate
 {
-    /** @param array<class-string<MigrationContract>, MigrationContract> $migrations */
+    /** @param array<string, MigrationContract> $migrations */
     private function __construct(
         private array $migrations,
     ) {
@@ -37,18 +38,42 @@ final class MigrationCollection implements \Countable, \IteratorAggregate
     #[\NoDiscard]
     public function with(MigrationContract $migration): self
     {
+        $identities = MigrationKey::identities($migration);
+
+        foreach ($this->migrations as $existing) {
+            if ($existing === $migration) {
+                return $this;
+            }
+
+            if (array_intersect($identities, MigrationKey::identities($existing)) !== []) {
+                throw new \InvalidArgumentException(
+                    'Duplicate migration key or legacy identity; no migration has been executed.',
+                );
+            }
+        }
+
         $migrations = $this->migrations;
-        $migrations[$migration::class] = $migration;
+        $migrations[MigrationKey::forMigration($migration)] = $migration;
 
         return new self($migrations);
     }
 
     public function get(string $migrationClass): ?MigrationContract
     {
-        return $this->migrations[$migrationClass] ?? null;
+        if (isset($this->migrations[$migrationClass])) {
+            return $this->migrations[$migrationClass];
+        }
+
+        $matches = array_filter($this->migrations, static fn (MigrationContract $migration): bool => $migration::class === $migrationClass);
+
+        if (count($matches) > 1) {
+            throw new \InvalidArgumentException('Ambiguous migration class; use its explicit stable key.');
+        }
+
+        return array_first($matches);
     }
 
-    /** @return array<class-string<MigrationContract>, MigrationContract> */
+    /** @return array<string, MigrationContract> */
     public function all(): array
     {
         return $this->migrations;

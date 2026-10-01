@@ -162,12 +162,9 @@ final class MigrationManagerTest extends TestCase
     }
     public function testAnonymousRecordsSurviveChangedReleaseDirectory(): void
     {
-        $migration = new class implements \SymPress\WordPress\Migration\Contract\Migration {
-            public function getVersion(): string { return '1.0.0'; }
-            public function up(): string { return 'SELECT should_not_run'; }
-            public function down(): string { return ''; }
-        };
+        $migration = $this->identityMigration('deployment-independent', '1.0.0');
         $legacyClass = str_replace(__DIR__, '/old/releases/2025/tests', $migration::class);
+        $migration->aliases = [$legacyClass];
         $tracker = new \SymPress\WordPress\Migration\Infrastructure\MigrationTracker($this->database);
         self::assertTrue($tracker->record('my-plugin', $legacyClass, '1.0.0'));
         $manager = $this->createMigrationManager($this->database, [$migration]);
@@ -175,5 +172,121 @@ final class MigrationManagerTest extends TestCase
         self::assertTrue($manager->runMigrations());
         self::assertCount(1, $manager->getMigratedVersions());
         self::assertSame($legacyClass, $manager->getMigratedVersions()[0]['migration']);
+    }
+
+    public function testAnonymousMigrationsWithoutKeysFailBeforeExecutingSql(): void
+    {
+        $first = require __DIR__ . '/fixtures/a/migrate.php';
+        $second = require __DIR__ . '/fixtures/b/migrate.php';
+        self::assertNotSame($first::class, $second::class);
+
+        foreach ([$first, $second] as $migration) {
+            try {
+                $this->createMigrationManager($this->database, [$migration]);
+                self::fail('An anonymous declaration requires a stable key.');
+            } catch (\InvalidArgumentException $exception) {
+                self::assertStringContainsString('getMigrationKey', $exception->getMessage());
+            }
+        }
+        self::assertSame([], $this->database->executedStatements);
+    }
+
+    public function testDuplicateKeysAndLegacyAliasesAreRejectedBeforeExecution(): void
+    {
+        foreach ([
+            [$this->identityMigration('same', '1.0.0'), $this->identityMigration('same', '1.0.0')],
+            [$this->identityMigration('one', '1.0.0', ['old']), $this->identityMigration('two', '1.0.0', ['old'])],
+        ] as $migrations) {
+            try {
+                $this->createMigrationManager($this->database, $migrations);
+                self::fail('Overlapping migration identities must be rejected.');
+            } catch (\InvalidArgumentException $exception) {
+                self::assertStringContainsString('Duplicate', $exception->getMessage());
+            }
+        }
+        self::assertSame([], $this->database->executedStatements);
+    }
+
+    public function testDistinctKeysFromOneDeclarationBothExecuteAndClassLookupIsAmbiguous(): void
+    {
+        $first = $this->identityMigration('one', '1.0.0');
+        $second = $this->identityMigration('two', '1.0.1');
+        self::assertSame($first::class, $second::class);
+        $manager = $this->createMigrationManager($this->database, [$first, $second]);
+        self::assertTrue($manager->runMigrations());
+        self::assertCount(2, $manager->getMigratedVersions());
+        self::assertContains('SELECT one', $this->database->executedStatements);
+        self::assertContains('SELECT two', $this->database->executedStatements);
+        $this->expectException(\InvalidArgumentException::class);
+        $manager->runMigration($first::class);
+    }
+
+    public function testUnknownLegacyAnonymousStateStopsBeforeAnyMigrationSql(): void
+    {
+        $tracker = new \SymPress\WordPress\Migration\Infrastructure\MigrationTracker($this->database);
+        self::assertTrue($tracker->record('my-plugin', "Migration@anonymous\0/old/a/migrate.php:1", '1.0.0'));
+        $this->database->executedStatements = [];
+        $manager = $this->createMigrationManager($this->database, [$this->identityMigration('new', '1.0.0')]);
+        try {
+            $manager->runMigrations();
+            self::fail('Unmapped legacy state must not be guessed.');
+        } catch (\RuntimeException $exception) {
+            self::assertStringContainsString('Unmapped legacy', $exception->getMessage());
+        }
+        self::assertSame([], $this->database->executedStatements);
+    }
+
+    public function testChangedEarlierSchemaRunsBeforeNewMigrationAndStopsOnFailure(): void
+    {
+        $original = $this->identityMigration('schema', 'schema:old');
+        $manager = $this->createMigrationManager($this->database, [$original]);
+        self::assertTrue($manager->markMigration('schema', 'up'));
+        $changed = $this->identityMigration('schema', 'schema:new');
+        $later = $this->identityMigration('later', '1.0.0');
+        $manager = $this->createMigrationManager($this->database, [$changed, $later]);
+        $this->database->executedStatements = [];
+        $this->database->failedStatements[] = 'SELECT schema';
+        self::assertFalse($manager->runMigrations());
+        self::assertNotContains('SELECT later', $this->database->executedStatements);
+        $this->database->failedStatements = [];
+        $this->database->executedStatements = [];
+        self::assertTrue($manager->runMigrations());
+        $operations = array_values(array_filter($this->database->executedStatements, static fn (string $sql): bool => in_array($sql, ['SELECT schema', 'SELECT later'], true)));
+        self::assertSame(['SELECT schema', 'SELECT later'], $operations);
+        self::assertFalse($manager->hasPendingMigrations());
+    }
+
+    public function testLegacyUpgradeAndRollbackRetireAllAppliedAliases(): void
+    {
+        foreach (['execute', 'mark'] as $mode) {
+            $slug = 'legacy-' . $mode;
+            $old = "Migration@anonymous\0/old/releases/1/migrate.php:1";
+            $tracker = new \SymPress\WordPress\Migration\Infrastructure\MigrationTracker($this->database);
+            self::assertTrue($tracker->record($slug, $old, 'schema:old'));
+            $migration = $this->identityMigration('schema-' . $mode, 'schema:new', [$old]);
+            $manager = $this->createMigrationManager($this->database, [$migration], $slug);
+            self::assertTrue($mode === 'execute' ? $manager->runMigrations() : $manager->markMigration('schema-' . $mode, 'up'));
+            self::assertCount(1, $manager->getMigratedVersions());
+            self::assertSame('schema-' . $mode, $manager->getMigratedVersions()[0]['migration']);
+            self::assertNull($tracker->findRecord($slug, $old));
+            self::assertTrue($mode === 'execute' ? $manager->rollbackMigrations() : $manager->markMigration('schema-' . $mode, 'down'));
+            self::assertSame([], $manager->getMigratedVersions());
+            self::assertNull($manager->getCurrentMigration());
+            $history = $manager->getMigrationHistory();
+            self::assertTrue($manager->rollbackMigrations());
+            self::assertSame($history, $manager->getMigrationHistory());
+        }
+    }
+
+    private function identityMigration(string $key, string $version, array $aliases = []): \SymPress\WordPress\Migration\Contract\Migration
+    {
+        return new class ($key, $version, $aliases) implements \SymPress\WordPress\Migration\Contract\Migration {
+            public function __construct(private string $key, private string $version, public array $aliases) {}
+            public function getMigrationKey(): string { return $this->key; }
+            public function getLegacyMigrationKeys(): array { return $this->aliases; }
+            public function getVersion(): string { return $this->version; }
+            public function up(): string { return 'SELECT ' . $this->key; }
+            public function down(): string { return 'SELECT down_' . $this->key; }
+        };
     }
 }
