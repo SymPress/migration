@@ -52,6 +52,7 @@ final readonly class MigrationLifecycle
 
     public function migrate(PluginSlug $pluginSlug, MigrationContract $migration): bool
     {
+        MigrationKey::identities($migration);
         $statements = $migration->up();
 
         return $this->runOperation($pluginSlug, $statements, function () use ($pluginSlug, $migration, $statements): bool {
@@ -76,7 +77,7 @@ final readonly class MigrationLifecycle
                 $timestamp,
             );
 
-            if (!$this->store->saveRecord($record)) {
+            if (!$this->saveCurrentRecord($migration, $record)) {
                 return false;
             }
 
@@ -88,6 +89,7 @@ final readonly class MigrationLifecycle
 
     public function rollback(PluginSlug $pluginSlug, MigrationContract $migration): bool
     {
+        MigrationKey::identities($migration);
         $statements = $migration->down();
 
         return $this->runOperation($pluginSlug, $statements, function () use ($pluginSlug, $migration, $statements): bool {
@@ -105,7 +107,7 @@ final readonly class MigrationLifecycle
         return $this->runOperation($pluginSlug, [], function () use ($pluginSlug, $migration): bool {
             $timestamp = $this->currentTimestamp();
 
-            if (!$this->store->deleteRecord($pluginSlug->value, $this->recordForMigration($pluginSlug, $migration)->migration ?? MigrationKey::forMigration($migration))) {
+            if (!$this->deleteAppliedIdentities($pluginSlug, $migration)) {
                 return false;
             }
 
@@ -129,20 +131,30 @@ final readonly class MigrationLifecycle
 
     public function recordForMigration(PluginSlug $pluginSlug, MigrationContract $migration): ?MigrationRecord
     {
-        $key = MigrationKey::forMigration($migration);
-        $record = $this->store->findRecord($pluginSlug->value, $key);
+        $records = [];
 
-        if ($record !== null) {
-            return $record;
-        }
+        foreach (MigrationKey::identities($migration) as $identity) {
+            $record = $this->store->findRecord($pluginSlug->value, $identity);
 
-        foreach ($this->store->findRecordsForPlugin($pluginSlug->value) as $legacy) {
-            if (MigrationKey::normalize($legacy->migration) === MigrationKey::normalize($migration::class)) {
-                return $legacy;
+            if ($record === null) {
+                continue;
             }
+
+            if ($identity === MigrationKey::forMigration($migration)) {
+                return $record;
+            }
+
+            $records[] = $record;
         }
 
-        return null;
+        $versions = array_unique(array_map(static fn (MigrationRecord $record): string => $record->version, $records));
+
+        if (count($versions) > 1) {
+            throw new \RuntimeException('Conflicting legacy migration versions; '
+                . 'reconcile the exact mapped identities before execution.');
+        }
+
+        return array_first($records);
     }
 
     /** @return list<MigrationExecution> */
@@ -160,7 +172,11 @@ final readonly class MigrationLifecycle
     {
         $existingRecord = $this->recordForMigration($pluginSlug, $migration);
 
-        if ($existingRecord !== null && $existingRecord->version === $migration->getVersion()) {
+        if (
+            $existingRecord !== null && $existingRecord->version === $migration->getVersion()
+            && $existingRecord->migration === MigrationKey::forMigration($migration)
+            && !$this->hasAppliedAliases($pluginSlug, $migration)
+        ) {
             return true;
         }
 
@@ -172,7 +188,7 @@ final readonly class MigrationLifecycle
             $timestamp,
         );
 
-        if (!$this->store->saveRecord($record)) {
+        if (!$this->saveCurrentRecord($migration, $record)) {
             return false;
         }
 
@@ -194,7 +210,7 @@ final readonly class MigrationLifecycle
 
         $timestamp = $this->currentTimestamp();
 
-        if (!$this->store->deleteRecord($pluginSlug->value, $this->recordForMigration($pluginSlug, $migration)->migration ?? MigrationKey::forMigration($migration))) {
+        if (!$this->deleteAppliedIdentities($pluginSlug, $migration)) {
             return false;
         }
 
@@ -217,6 +233,43 @@ final readonly class MigrationLifecycle
     public function getSqlExecutor(): MigrationSqlExecutor
     {
         return $this->sqlExecutor;
+    }
+
+    private function saveCurrentRecord(MigrationContract $migration, MigrationRecord $record): bool
+    {
+        if (!$this->store->saveRecord($record)) {
+            return false;
+        }
+
+        foreach (MigrationKey::identities($migration) as $identity) {
+            if ($identity !== $record->migration && !$this->store->deleteRecord($record->plugin, $identity)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function deleteAppliedIdentities(PluginSlug $pluginSlug, MigrationContract $migration): bool
+    {
+        foreach (MigrationKey::identities($migration) as $identity) {
+            if (!$this->store->deleteRecord($pluginSlug->value, $identity)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function hasAppliedAliases(PluginSlug $pluginSlug, MigrationContract $migration): bool
+    {
+        foreach (MigrationKey::identities($migration) as $identity) {
+            if ($identity !== MigrationKey::forMigration($migration) && $this->store->findRecord($pluginSlug->value, $identity) !== null) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

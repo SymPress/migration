@@ -170,6 +170,71 @@ final class WordPressDatabaseProbeTest extends TestCase
         }
     }
 
+    public function testIdentityUpgradeAndRollbackAreAtomicAndKeepHistory(): void
+    {
+        $this->database->query($this->database->prepare('CREATE TABLE %i (id bigint NOT NULL, PRIMARY KEY  (id)) ENGINE=InnoDB', $this->table));
+        $tracker = new MigrationTracker($this->database);
+        $lifecycle = new \SymPress\WordPress\Migration\Application\MigrationLifecycle($tracker, new WordPressSqlExecutor($this->database));
+        self::assertTrue($lifecycle->ensureStorageIsReady());
+
+        foreach (['execute', 'mark'] as $mode) {
+            $slug = \SymPress\WordPress\Migration\Value\PluginSlug::fromString('identity-' . $mode);
+            $legacy = "Migration@anonymous\0/old/releases/1/migrate.php:1";
+            self::assertTrue($tracker->record($slug->value, $legacy, 'schema:old'));
+            self::assertTrue($tracker->appendHistory(new MigrationExecution($slug->value, $legacy, 'schema:old', 'up', '2026-01-01 00:00:00')));
+            $migration = $this->identityProbe($legacy);
+            self::assertTrue($mode === 'execute' ? $lifecycle->migrate($slug, $migration) : $lifecycle->markMigrated($slug, $migration));
+            self::assertCount(1, $tracker->findRecordsForPlugin($slug->value));
+            self::assertNull($tracker->findRecord($slug->value, $legacy));
+            self::assertSame('schema:new', $tracker->findRecord($slug->value, 'identity-probe')->version);
+            self::assertCount(2, $tracker->findHistoryForPlugin($slug->value));
+            self::assertTrue($mode === 'execute' ? $lifecycle->rollback($slug, $migration) : $lifecycle->markRolledBack($slug, $migration));
+            self::assertSame([], $tracker->findRecordsForPlugin($slug->value));
+            self::assertFalse($lifecycle->hasBeenMigrated($slug, $migration));
+            self::assertCount(3, $tracker->findHistoryForPlugin($slug->value));
+            self::assertTrue($lifecycle->rollback($slug, $migration));
+            self::assertCount(3, $tracker->findHistoryForPlugin($slug->value));
+        }
+    }
+
+    public function testIdentityUpgradeFailureRestoresLegacyStateAndDml(): void
+    {
+        $this->database->query($this->database->prepare('CREATE TABLE %i (id bigint NOT NULL, PRIMARY KEY  (id)) ENGINE=InnoDB', $this->table));
+        $tracker = new MigrationTracker($this->database);
+        $lifecycle = new \SymPress\WordPress\Migration\Application\MigrationLifecycle($tracker, new WordPressSqlExecutor($this->database));
+        self::assertTrue($lifecycle->ensureStorageIsReady());
+        $legacy = "Migration@anonymous\0/old/releases/1/migrate.php:1";
+        $slug = \SymPress\WordPress\Migration\Value\PluginSlug::fromString('identity-failure');
+        self::assertTrue($tracker->record($slug->value, $legacy, 'schema:old'));
+        $this->database->query($this->database->prepare("CREATE TRIGGER sympress_review_identity_history_failure BEFORE INSERT ON %i FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Review fixture failure'", $this->historyTable));
+        $migration = $this->identityProbe($legacy);
+        $this->database->suppress_errors(true);
+        try {
+            self::assertFalse($lifecycle->migrate($slug, $migration));
+            self::assertSame('0', $this->database->get_var($this->database->prepare('SELECT COUNT(*) FROM %i', $this->table)));
+            self::assertSame('schema:old', $tracker->findRecord($slug->value, $legacy)->version);
+            self::assertNull($tracker->findRecord($slug->value, 'identity-probe'));
+            self::assertSame([], $tracker->findHistoryForPlugin($slug->value));
+            self::assertFalse($lifecycle->markMigrated($slug, $migration));
+            self::assertSame('schema:old', $tracker->findRecord($slug->value, $legacy)->version);
+            self::assertNull($tracker->findRecord($slug->value, 'identity-probe'));
+        } finally {
+            $this->database->suppress_errors(false);
+        }
+    }
+
+    private function identityProbe(string $legacy): \SymPress\WordPress\Migration\Contract\Migration
+    {
+        return new class ($this->database, $this->table, $legacy) implements \SymPress\WordPress\Migration\Contract\Migration {
+            public function __construct(private \wpdb $database, private string $table, private string $legacy) {}
+            public function getMigrationKey(): string { return 'identity-probe'; }
+            public function getLegacyMigrationKeys(): array { return [$this->legacy]; }
+            public function getVersion(): string { return 'schema:new'; }
+            public function up(): string { return $this->database->prepare('INSERT INTO %i (id) VALUES (%d)', $this->table, 1); }
+            public function down(): string { return $this->database->prepare('DELETE FROM %i WHERE id = %d', $this->table, 1); }
+        };
+    }
+
     private function dropProbeTables(): void
     {
         foreach ([$this->table, $this->stateTable, $this->historyTable] as $table) {

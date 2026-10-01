@@ -62,13 +62,32 @@ change.
 
 ## Identity, deployment and table scoping
 
-Named migration classes keep their class identity. Anonymous migration keys drop
-the absolute release directory and retain source basename plus declaration line;
-existing applied class records are found through the same normalization and are
-preserved. Anonymous migrations whose source declaration moves should expose a
-stable `getMigrationKey(): string`; explicit keys must be non-empty and fit 255
-bytes. The ORM bridge uses `orm-schema:<manager>` so its identity also survives
-source edits. Versions remain separate from keys.
+Named migration classes keep their class identity unless they declare a stable
+`getMigrationKey(): string`. Anonymous migrations **require** that method;
+basename/line and release-directory heuristics cannot establish unique identity.
+Explicit keys must be non-empty, contain no NUL and fit 255 bytes. The ORM bridge
+uses `orm-schema:<manager>`. Versions remain separate from keys. Collections are
+indexed by these keys, support multiple instances of an anonymous declaration
+with distinct keys, and reject overlapping keys/legacy aliases before execution.
+Class-based lookup of multiple such instances is ambiguous; use the stable key.
+
+Before upgrading old anonymous migrations, inspect the recorded state and
+explicitly map each exact historical identity through
+`getLegacyMigrationKeys(): array` (a list of recorded strings, including PHP's
+NUL-separated anonymous class name). Never guess identity from a filename, line
+or schema hash. Unmapped anonymous state stops migration/rollback/mark operations
+before migration SQL or metadata DDL. Historical records whose migration was
+removed must be explicitly reconciled by the operator with backups and history
+retained. Named classes automatically recognize their own old class key.
+
+Saving a new current version or marking it up retires mapped obsolete applied
+keys in the same metadata transaction and retains append-only history. Rollback
+and mark-down remove all applied aliases, so old state cannot reappear. Multiple
+legacy aliases with conflicting versions require explicit reconciliation.
+An up-to-date legacy record remains valid; `mark up` can explicitly move it to
+the canonical key without executing SQL. Forward targets rescan all pending
+migrations through that target in registration order, including changed earlier
+schema hashes; a failure prevents later migrations from running.
 
 Default state/history tables use the current site's `$wpdb->prefix`, including
 its multisite blog prefix. A custom state table produces `<state_table>_history`
