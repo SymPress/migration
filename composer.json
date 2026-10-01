@@ -12,7 +12,7 @@
     ],
     "require": {
         "php": "^8.5",
-        "sympress/kernel": "dev-main",
+        "sympress/kernel": "^1.1.1",
         "symfony/console": "^8.0"
     },
     "require-dev": {
@@ -21,7 +21,7 @@
         "johnpbloch/wordpress": "^7.0",
         "mockery/mockery": "^1.6",
         "symfony/var-dumper": "^8.1",
-        "sympress/qa": "dev-main"
+        "sympress/qa": "^0.1.2"
     },
     "autoload": {
         "psr-4": {
@@ -68,15 +68,6 @@
             "phpstan/extension-installer": true
         }
     },
-    "repositories": [
-        {
-            "type": "path",
-            "url": "./../*",
-            "options": {
-                "symlink": true
-            }
-        }
-    ],
     "suggest": {
         "sympress/orm": "Enables entity metadata driven schema migrations through the ORM bridge."
     },
@@ -87,6 +78,6 @@
             "entry": "migration/migration.php"
         }
     },
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
     "prefer-stable": true
 }

@@ -59,6 +59,9 @@ against a disposable MariaDB database and probes `dbDelta()`, ordinary queries,
 schema changes, current state, and append-only history through the real `wpdb`
 implementation. Run it for every database-boundary or schema-engine-specific
 change.
+The bootstrap requires an explicit `WORDPRESS_DB_NAME=sympress_review_*` value;
+it refuses general application databases. Required database CI fails skipped or
+incomplete tests and runs on pull requests, main and the weekly schedule.
 
 ## Identity, deployment and table scoping
 
@@ -70,6 +73,10 @@ uses `orm-schema:<manager>`. Versions remain separate from keys. Collections are
 indexed by these keys, support multiple instances of an anonymous declaration
 with distinct keys, and reject overlapping keys/legacy aliases before execution.
 Class-based lookup of multiple such instances is ambiguous; use the stable key.
+Registering a different object with an existing key is an error. A manager that
+intentionally updates a registered schema definition in one process must use
+`replaceMigration()`; it preserves registration order and validates every legacy
+identity against the other registrations. Unknown replacement keys fail.
 
 Before upgrading old anonymous migrations, inspect the recorded state and
 explicitly map each exact historical identity through

@@ -1,0 +1,21 @@
+* text=auto eol=lf
+
+/.github export-ignore
+/tests export-ignore
+/docs export-ignore
+/AGENTS.md export-ignore
+/CONTRIBUTING.md export-ignore
+/qa-adoption.json export-ignore
+/phpcs.xml export-ignore
+/phpcs.xml.dist export-ignore
+/phpstan.neon export-ignore
+/phpstan.neon.dist export-ignore
+/phpunit*.xml* export-ignore
+/.php-cs-fixer* export-ignore
+/.gitignore export-ignore
+/.gitattributes export-ignore
+/.env* export-ignore
+/auth.json export-ignore
+/.npmrc export-ignore
+/composer.review*.json export-ignore
+/composer.review*.lock export-ignore
