@@ -15,7 +15,7 @@ The package now targets a real PHP 8.5 baseline and uses modern language feature
 ## Quality Gates
 
 - `friendsofphp/php-cs-fixer` handles deterministic PSR-12-oriented formatting.
-- `inpsyde/php-coding-standards` handles the WordPress, VIP, PHPCompatibility, and security-oriented PHPCS audit for `migration.php` and `src/`.
+- `sympress/coding-standards` handles the WordPress, VIP, PHPCompatibility, and security-oriented PHPCS audit for `migration.php` and `src/`.
 - `phpstan/phpstan` and PHPUnit cover the full package, including the PHP 8.5 get-hook value objects that PHPCS cannot parse reliably yet.
 
 ## Installation
