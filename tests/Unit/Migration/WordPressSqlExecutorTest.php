@@ -51,4 +51,31 @@ final class WordPressSqlExecutorTest extends TestCase
         ]));
         self::assertSame([$failed], $this->database->executedStatements);
     }
+
+    public function testDeferredPlanningFailureAlwaysReleasesTheLock(): void
+    {
+        $database = new class extends \wpdb {
+            public bool $locked = false;
+
+            public function get_var(string $query): string|int|null
+            {
+                if (str_starts_with($query, 'SELECT GET_LOCK(')) {
+                    $this->locked = true;
+                } elseif (str_starts_with($query, 'SELECT RELEASE_LOCK(')) {
+                    $this->locked = false;
+                }
+                return parent::get_var($query);
+            }
+        };
+        try {
+            (new WordPressSqlExecutor($database))->runDeferredOperation('broken-plan', static function (): array {
+                throw new \RuntimeException('Cannot inspect live schema.');
+            }, static fn (): bool => false);
+            self::fail('The planning error must propagate.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Cannot inspect live schema.', $exception->getMessage());
+        }
+        self::assertFalse($database->locked);
+        self::assertSame([], $database->executedStatements);
+    }
 }

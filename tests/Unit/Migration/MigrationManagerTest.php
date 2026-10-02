@@ -11,6 +11,7 @@ use SymPress\WordPress\Migration\Tests\Support\CreatesMigrationManagers;
 use SymPress\WordPress\Migration\Tests\Support\SchemaHashMigration;
 use SymPress\WordPress\Migration\Tests\Support\WordPressState;
 use PHPUnit\Framework\TestCase;
+use SymPress\WordPress\Migration\Contract\Migration;
 
 final class MigrationManagerTest extends TestCase
 {
@@ -52,6 +53,56 @@ final class MigrationManagerTest extends TestCase
         );
         self::assertCount(2, $this->manager->getMigrationHistory());
         self::assertSame('up', $this->manager->getMigrationHistory()[0]['direction']);
+    }
+
+    public function testSqlPlansAreResolvedOnlyWhileTheDatabaseLockIsHeld(): void
+    {
+        $database = new class extends \wpdb {
+            public bool $locked = false;
+
+            public function get_var(string $query): string|int|null
+            {
+                if (str_starts_with($query, 'SELECT GET_LOCK(')) {
+                    $this->locked = true;
+                } elseif (str_starts_with($query, 'SELECT RELEASE_LOCK(')) {
+                    $this->locked = false;
+                }
+                return parent::get_var($query);
+            }
+        };
+        $GLOBALS['wpdb'] = $database;
+        $migration = new class ($database) implements Migration {
+            public function __construct(private readonly \wpdb $database)
+            {
+            }
+
+            public function getMigrationKey(): string
+            {
+                return 'deferred-schema';
+            }
+
+            public function getVersion(): string
+            {
+                return 'schema:deferred';
+            }
+
+            public function up(): array
+            {
+                TestCase::assertTrue($this->database->locked, 'Schema planning must run after GET_LOCK.');
+                return ['CREATE TABLE wp_deferred (id INT)'];
+            }
+
+            public function down(): array
+            {
+                TestCase::assertTrue($this->database->locked, 'Rollback planning must run after GET_LOCK.');
+                return ['DROP TABLE wp_deferred'];
+            }
+        };
+        $manager = $this->createMigrationManager($database, [$migration]);
+        self::assertTrue($manager->runMigrations());
+        self::assertFalse($database->locked);
+        self::assertTrue($manager->rollbackMigrations());
+        self::assertFalse($database->locked);
     }
 
     public function test_it_can_migrate_to_specific_versions_and_report_current_state(): void
