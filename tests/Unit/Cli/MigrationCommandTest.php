@@ -54,6 +54,70 @@ final class MigrationCommandTest extends TestCase
         );
     }
 
+    public function testAllPluginsContinuesAfterThrownAndReturnedFailuresAndReportsFailure(): void
+    {
+        $registry = MigrationRegistry::getInstance();
+        $registry->clear();
+        foreach (['throws', 'returns-false'] as $slug) {
+            $failed = new class ($slug, $this->database) extends MigrationManager {
+                public function __construct(private string $mode, \wpdb $database)
+                {
+                    parent::__construct(\SymPress\WordPress\Migration\Value\PluginSlug::fromString($mode), new \SymPress\WordPress\Migration\Application\MigrationLifecycle(new \SymPress\WordPress\Migration\Infrastructure\MigrationTracker($database), new \SymPress\WordPress\Migration\Infrastructure\WordPressSqlExecutor($database)));
+                }
+                public function hasPendingMigrations(): bool { return true; }
+                public function runMigrations(): bool
+                {
+                    if ($this->mode === 'throws') { throw new \RuntimeException('credentialSentinel'); }
+                    return false;
+                }
+            };
+            $registry->set($slug, $failed);
+        }
+        $registry->set('my-plugin', $this->manager);
+        try {
+            $this->command->migrate([]);
+            self::fail('Aggregate failure must return a failing CLI result.');
+        } catch (\RuntimeException $exception) {
+            self::assertStringContainsString('2 plugin(s)', $exception->getMessage());
+        }
+        self::assertFalse($this->manager->hasPendingMigrations());
+        self::assertCount(2, WordPressState::$cliCalls['warning']);
+        self::assertStringNotContainsString('credentialSentinel', json_encode(WordPressState::$cliCalls, JSON_THROW_ON_ERROR));
+    }
+
+    public function testAdoptionRequiresAdministratorAndExplicitConfirmationBeforeStorageMutation(): void
+    {
+        foreach ([false, true] as $administrator) {
+            WordPressState::$administrator = $administrator;
+            try {
+                $this->command->adopt(['my-plugin', 'stable'], []);
+                self::fail('Unconfirmed or unprivileged adoption accepted.');
+            } catch (\RuntimeException) {
+                self::assertSame([], $this->manager->getMigratedVersions());
+            }
+        }
+        self::assertFalse($this->database->hasTable('wp_migrations'));
+    }
+
+    public function testAdministratorCanAdoptTheExactBinaryLegacyIdentityWithoutExecutingSql(): void
+    {
+        $legacy = "Migration@anonymous\0/old/release.php:40";
+        $tracker = new \SymPress\WordPress\Migration\Infrastructure\MigrationTracker($this->database);
+        self::assertTrue($tracker->record('my-plugin', $legacy, '0.9.0'));
+        WordPressState::$administrator = true;
+        $this->command->adopt(['my-plugin', CreateCustomersTableMigration::class], [
+            'legacy-base64' => base64_encode($legacy),
+            'expected-version' => '0.9.0',
+            'yes' => true,
+        ]);
+        self::assertNull($tracker->getVersion('my-plugin', $legacy));
+        self::assertSame('0.9.0', $tracker->getVersion('my-plugin', CreateCustomersTableMigration::class));
+        self::assertFalse($this->database->hasTable('wp_customers'));
+        self::assertTrue($this->manager->hasPendingMigrations());
+        self::assertSame('adopt', $this->manager->getMigrationHistory()[0]['direction']);
+        self::assertCount(1, WordPressState::$cliCalls['success']);
+    }
+
     public function test_migrate_can_target_a_specific_version(): void
     {
         $this->command->migrate(['my-plugin', '1.0.0']);

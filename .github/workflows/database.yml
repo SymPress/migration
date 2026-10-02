@@ -13,17 +13,31 @@ permissions:
 
 jobs:
   database:
+    name: Database (${{ matrix.engine }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - engine: MariaDB 11.8
+            image: mariadb:11.8@sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68
+            health: healthcheck.sh --connect --innodb_initialized
+          - engine: MySQL 8.4
+            image: mysql:8.4@sha256:80f4933e3835f9dc4d35a28ec500d7986cb4414e6c6821c5461239cb7beb8995
+            health: mysqladmin ping -h 127.0.0.1 --silent
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
       database:
-        image: mariadb:11.8@sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68
+        image: ${{ matrix.image }}
         env:
           MARIADB_ROOT_PASSWORD: sympress-database-test-only
           MARIADB_DATABASE: sympress_review_migration
+          MYSQL_ROOT_PASSWORD: sympress-database-test-only
+          MYSQL_DATABASE: sympress_review_migration
+          MYSQL_ROOT_HOST: '%'
         ports: ['3306:3306']
         options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-cmd="${{ matrix.health }}"
           --health-interval=10s --health-timeout=5s --health-retries=10
     env:
       CI: 'true'

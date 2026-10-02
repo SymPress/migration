@@ -171,21 +171,31 @@ final readonly class MigrationCommandExecutor
         }
 
         $processed = 0;
+        $failed = 0;
 
         foreach ($managers as $slug => $manager) {
-            if (!$manager->hasPendingMigrations()) {
-                continue;
+            try {
+                if (!$manager->hasPendingMigrations()) {
+                    continue;
+                }
+                $processed++;
+                WP_CLI::log(sprintf('Running pending migrations for "%s"...', $slug));
+                if ($manager->runMigrations()) {
+                    WP_CLI::success(sprintf('Completed migrations for "%s".', $slug));
+                    continue;
+                }
+            } catch (\Throwable) {
+                // Keep SQL, credentials and exception messages out of the CLI diagnostic.
             }
+            $failed++;
+            WP_CLI::warning(sprintf('Migration failed for "%s"; reconcile its state before retrying.', $slug));
+        }
 
-            $processed++;
-            WP_CLI::log(sprintf('Running pending migrations for "%s"...', $slug));
-
-            if ($manager->runMigrations()) {
-                WP_CLI::success(sprintf('Completed migrations for "%s".', $slug));
-                continue;
-            }
-
-            WP_CLI::error(sprintf('Migration failed for "%s".', $slug));
+        if ($failed > 0) {
+            WP_CLI::error(sprintf(
+                'Migrations failed for %d plugin(s); other registered plugins were processed.',
+                $failed,
+            ));
         }
 
         if ($processed === 0) {
