@@ -51,7 +51,14 @@ explicit reconciliation operation and does not execute migration SQL.
 
 The WordPress executor holds a database advisory lock around each actual
 operation, rechecks applied state after acquiring it, and releases it in a
-`finally` block. The lock includes database, WordPress prefix and plugin scope.
+`finally` block. It also resolves forward/rollback SQL under that lock, before
+classifying the resolved statements for transactional execution. This keeps
+live-schema plans current when another worker changed the database while waiting.
+Custom executors can implement the additive
+`DeferredMigrationOperationExecutor` contract for this behavior; the original
+`MigrationOperationExecutor` and `MigrationSqlExecutor` contracts remain valid
+with their previous semantics. The WordPress executor implements both operation
+contracts. The lock includes database, WordPress prefix and plugin scope.
 DML-only operations use a transaction spanning SQL, state and history on
 transactional tables. State/history writes also use a transaction after DDL.
 MySQL/MariaDB DDL can commit independently and is never claimed to be atomic.

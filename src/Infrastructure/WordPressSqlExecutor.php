@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace SymPress\WordPress\Migration\Infrastructure;
 
-use SymPress\WordPress\Migration\Contract\MigrationOperationExecutor;
+use SymPress\WordPress\Migration\Contract\DeferredMigrationOperationExecutor;
 use SymPress\WordPress\Migration\Contract\MigrationSqlExecutor;
 
-final class WordPressSqlExecutor implements MigrationSqlExecutor, MigrationOperationExecutor
+final class WordPressSqlExecutor implements MigrationSqlExecutor, DeferredMigrationOperationExecutor
 {
     private int $transactionDepth = 0;
 
@@ -43,6 +43,15 @@ final class WordPressSqlExecutor implements MigrationSqlExecutor, MigrationOpera
      */
     public function runOperation(string $scope, string|array $statements, callable $operation): bool
     {
+        return $this->runDeferredOperation($scope, static fn (): string|array => $statements, static fn (): bool => $operation());
+    }
+
+    /**
+     * @param callable(): (string|list<string>) $statements
+     * @param callable(string|list<string>): bool $operation
+     */
+    public function runDeferredOperation(string $scope, callable $statements, callable $operation): bool
+    {
         $databaseName = $this->database->get_var('SELECT DATABASE()');
         $lock = 'sympress-migration:' . substr(
             hash('sha256', $databaseName . ':' . $this->database->prefix . ':' . $scope),
@@ -55,12 +64,12 @@ final class WordPressSqlExecutor implements MigrationSqlExecutor, MigrationOpera
             return false;
         }
 
-        $transactional = $this->supportsTransaction($statements);
-
         $started = false;
         $counted = false;
 
         try {
+            $resolved = $statements();
+            $transactional = $this->supportsTransaction($resolved);
             if ($transactional && $this->transactionDepth === 0) {
                 $started = $this->database->query('START TRANSACTION') !== false;
 
@@ -74,7 +83,7 @@ final class WordPressSqlExecutor implements MigrationSqlExecutor, MigrationOpera
                 $counted = true;
             }
 
-            $success = $operation();
+            $success = $operation($resolved);
 
             if ($started) {
                 if ($this->database->query($success ? 'COMMIT' : 'ROLLBACK') === false) {

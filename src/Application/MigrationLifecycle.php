@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SymPress\WordPress\Migration\Application;
 
+use SymPress\WordPress\Migration\Contract\DeferredMigrationOperationExecutor;
 use SymPress\WordPress\Migration\Contract\Migration as MigrationContract;
 use SymPress\WordPress\Migration\Contract\MigrationOperationExecutor;
 use SymPress\WordPress\Migration\Contract\MigrationSqlExecutor;
@@ -53,6 +54,13 @@ final readonly class MigrationLifecycle
     public function migrate(PluginSlug $pluginSlug, MigrationContract $migration): bool
     {
         MigrationKey::identities($migration);
+        if ($this->sqlExecutor instanceof DeferredMigrationOperationExecutor) {
+            return $this->sqlExecutor->runDeferredOperation(
+                $pluginSlug->value,
+                fn (): string|array => $this->needsUpdate($pluginSlug, $migration) ? $migration->up() : [],
+                fn (string|array $statements): bool => !$this->needsUpdate($pluginSlug, $migration) || $this->migrateUnlocked($pluginSlug, $migration, $statements),
+            );
+        }
         $statements = $migration->up();
 
         return $this->runOperation($pluginSlug, $statements, function () use ($pluginSlug, $migration, $statements): bool {
@@ -90,6 +98,13 @@ final readonly class MigrationLifecycle
     public function rollback(PluginSlug $pluginSlug, MigrationContract $migration): bool
     {
         MigrationKey::identities($migration);
+        if ($this->sqlExecutor instanceof DeferredMigrationOperationExecutor) {
+            return $this->sqlExecutor->runDeferredOperation(
+                $pluginSlug->value,
+                fn (): string|array => $this->hasBeenMigrated($pluginSlug, $migration) ? $migration->down() : [],
+                fn (string|array $statements): bool => !$this->hasBeenMigrated($pluginSlug, $migration) || $this->rollbackUnlocked($pluginSlug, $migration, $statements),
+            );
+        }
         $statements = $migration->down();
 
         return $this->runOperation($pluginSlug, $statements, function () use ($pluginSlug, $migration, $statements): bool {
