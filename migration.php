@@ -3,7 +3,7 @@
 /**
  * Plugin Name: Database Migration System
  * Description: Standalone MU plugin for versioned WordPress database migrations.
- * Version: 1.0.5
+ * Version: 1.0.6
  * Requires at least: 6.9
  * Requires PHP: 8.5
  * Author: Brian Schaeffner

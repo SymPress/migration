@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 where applicable.
 
+## 1.0.6 — 2026-10-02
+
+- Document the two narrowly scoped WordPress Plugin Check exceptions for the private temporary CSV-formatting stream; WordPress file-operation checks remain enabled elsewhere.
+
 ## 1.0.5 — 2026-10-02
 
 - Grant the archive caller the permissions required by the pinned reusable workflow, with artifact attestations still explicitly disabled.
