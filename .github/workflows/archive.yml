@@ -19,8 +19,19 @@ permissions:
 
 jobs:
   archive:
+    permissions:
+      contents: read
+      actions: read
+      attestations: write
+      id-token: write
     uses: sympress/workflows/.github/workflows/wordpress-archive.yml@177fa0d727b278d2103052ec77c102b4a4c492a0
     with:
+      artifact_attestation: false
+      artifact_extra_excludes: >-
+        /tests /docs /AGENTS.md /CONTRIBUTING.md /qa-adoption.json
+        /phpcs.xml /phpcs.xml.dist /phpstan.neon /phpstan.neon.dist
+        /phpunit*.xml* /.php-cs-fixer* /.gitignore /.gitattributes
+        /composer.review*.json /composer.review*.lock
       main_file: migration.php
       package_version: ${{ github.event.inputs.version }}
     secrets:
