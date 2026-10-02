@@ -180,6 +180,23 @@ class MigrationManager
         return false;
     }
 
+    public function adoptLegacyMigration(string $migrationKey, string $legacyKey, string $expectedVersion): bool
+    {
+        $migration = $this->getMigration($migrationKey);
+        if ($migration === null || MigrationKey::forMigration($migration) !== $migrationKey) {
+            throw new \InvalidArgumentException('Adoption requires the exact registered stable migration key.');
+        }
+        foreach ($this->migrations->all() as $other) {
+            if ($other !== $migration && in_array($legacyKey, MigrationKey::identities($other), true)) {
+                throw new \InvalidArgumentException('Legacy identity already belongs to another registered migration.');
+            }
+        }
+        if (!$this->lifecycle->ensureStorageIsReady()) {
+            return false;
+        }
+        return $this->lifecycle->adoptLegacyMigration($this->pluginSlug, $migration, $legacyKey, $expectedVersion);
+    }
+
     public function needsUpdate(string $migrationClass): bool
     {
         $migration = $this->getMigration($migrationClass);

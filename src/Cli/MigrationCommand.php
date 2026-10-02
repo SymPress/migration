@@ -12,7 +12,7 @@ final readonly class MigrationCommand
     private MigrationCommandReporter $reporter;
 
     public function __construct(
-        ?MigrationRegistry $registry = null,
+        private ?MigrationRegistry $registry = null,
         ?SymfonyConsoleRunner $consoleRunner = null,
     ) {
 
@@ -125,6 +125,48 @@ final readonly class MigrationCommand
     public function version(array $args, array $assocArgs): void
     {
         $this->executor->version($args, $assocArgs);
+    }
+
+    /**
+     * Adopt one reviewed legacy identity without running migration SQL.
+     *
+     * ## OPTIONS
+     *
+     * <plugin>
+     * : Registered plugin slug.
+     * <migration>
+     * : Exact registered stable migration key.
+     * --legacy-base64=<identity>
+     * : Base64 encoded exact old identity, including binary bytes.
+     * --expected-version=<version>
+     * : Exact version already recorded for the old identity.
+     * --yes
+     * : Confirm the reviewed metadata adoption.
+     *
+     * @param list<string> $args
+     * @param array<string, scalar|null> $assocArgs
+     */
+    public function adopt(array $args, array $assocArgs): void
+    {
+        if (!function_exists('current_user_can') || !current_user_can('manage_options')) {
+            \WP_CLI::error('Adoption requires a loaded WordPress administrator; select one with --user.');
+        }
+        if (($assocArgs['yes'] ?? false) !== true) {
+            \WP_CLI::error('Adoption requires explicit --yes confirmation after reviewing the legacy state.');
+        }
+        $encoded = $assocArgs['legacy-base64'] ?? null;
+        // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Exact binary identity transport, no executable payload.
+        $legacy = is_string($encoded) ? base64_decode($encoded, true) : false;
+        $version = $assocArgs['expected-version'] ?? null;
+        if ($legacy === false || $legacy === '' || !is_string($version) || $version === '') {
+            \WP_CLI::error('Provide the exact --legacy-base64 identity and --expected-version.');
+        }
+        $context = new MigrationCommandContext($this->registry);
+        $manager = $context->managerOrFail($context->requirePluginSlug($args, 'adopt'));
+        if (!$manager->adoptLegacyMigration($context->requireMigrationClass($args, 'adopt'), $legacy, $version)) {
+            \WP_CLI::error('Legacy adoption failed; reconcile metadata before retrying.');
+        }
+        \WP_CLI::success('Legacy identity adopted; recorded version and existing history retained.');
     }
 
     /**

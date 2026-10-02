@@ -26,6 +26,7 @@ namespace SymPress\WordPress\Migration\Tests\Support {
 
         public static string $currentTime = '2026-03-27 12:00:00';
         public static string $environmentType = 'development';
+        public static bool $administrator = false;
 
         public static function reset(): void
         {
@@ -41,6 +42,7 @@ namespace SymPress\WordPress\Migration\Tests\Support {
             ];
             self::$currentTime = '2026-03-27 12:00:00';
             self::$environmentType = 'development';
+            self::$administrator = false;
         }
     }
 }
@@ -48,6 +50,13 @@ namespace SymPress\WordPress\Migration\Tests\Support {
 namespace {
 
     use SymPress\WordPress\Migration\Tests\Support\WordPressState;
+
+    if (!function_exists('current_user_can')) {
+        function current_user_can(string $capability): bool
+        {
+            return $capability === 'manage_options' && WordPressState::$administrator;
+        }
+    }
 
     if (!function_exists('wp_get_environment_type')) {
         function wp_get_environment_type(): string

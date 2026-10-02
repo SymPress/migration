@@ -303,6 +303,56 @@ final class MigrationManagerTest extends TestCase
         $manager->runMigration($first::class);
     }
 
+    public function testAdoptionRetainsRecordedVersionAndHistoryWithoutExecutingMigrationSql(): void
+    {
+        $legacy = "Migration@anonymous\0/old/release/SchemaMigrationFactory.php:40";
+        $tracker = new \SymPress\WordPress\Migration\Infrastructure\MigrationTracker($this->database);
+        self::assertTrue($tracker->record('my-plugin', $legacy, 'schema:old'));
+        self::assertTrue($tracker->appendHistory(new \SymPress\WordPress\Migration\Value\MigrationExecution('my-plugin', $legacy, 'schema:old', 'up', '2026-09-01 12:00:00')));
+        $manager = $this->createMigrationManager($this->database, [$this->identityMigration('orm-schema:default', 'schema:new')]);
+        self::assertTrue($manager->adoptLegacyMigration('orm-schema:default', $legacy, 'schema:old'));
+        self::assertNull($tracker->getVersion('my-plugin', $legacy));
+        self::assertSame('schema:old', $tracker->getVersion('my-plugin', 'orm-schema:default'));
+        self::assertTrue($manager->hasPendingMigrations());
+        self::assertSame(['adopt', 'up'], array_column($manager->getMigrationHistory(), 'direction'));
+        self::assertSame($legacy, $manager->getMigrationHistory()[1]['migration']);
+        self::assertNotContains('SELECT orm-schema:default', $this->database->executedStatements);
+    }
+
+    public function testAdoptionCannotTakeAnIdentityMappedToAnotherMigration(): void
+    {
+        $legacy = "Migration@anonymous\0/old/release.php:40";
+        $tracker = new \SymPress\WordPress\Migration\Infrastructure\MigrationTracker($this->database);
+        self::assertTrue($tracker->record('my-plugin', $legacy, 'schema:old'));
+        $manager = $this->createMigrationManager($this->database, [
+            $this->identityMigration('orm-schema:default', 'schema:new'),
+            $this->identityMigration('other-schema', 'schema:old', [$legacy]),
+        ]);
+        try {
+            $manager->adoptLegacyMigration('orm-schema:default', $legacy, 'schema:old');
+            self::fail('Identity belonging to another migration was adopted.');
+        } catch (\InvalidArgumentException) {
+            self::assertSame('schema:old', $tracker->getVersion('my-plugin', $legacy));
+            self::assertNull($tracker->getVersion('my-plugin', 'orm-schema:default'));
+        }
+    }
+
+    public function testAdoptionRejectsChangedVersionBeforeRetiringLegacyIdentity(): void
+    {
+        $legacy = "Migration@anonymous\0/old/release.php:40";
+        $tracker = new \SymPress\WordPress\Migration\Infrastructure\MigrationTracker($this->database);
+        self::assertTrue($tracker->record('my-plugin', $legacy, 'schema:changed'));
+        $manager = $this->createMigrationManager($this->database, [$this->identityMigration('orm-schema:default', 'schema:new')]);
+        try {
+            $manager->adoptLegacyMigration('orm-schema:default', $legacy, 'schema:reviewed');
+            self::fail('Changed legacy version accepted.');
+        } catch (\RuntimeException) {
+            self::assertSame('schema:changed', $tracker->getVersion('my-plugin', $legacy));
+            self::assertNull($tracker->getVersion('my-plugin', 'orm-schema:default'));
+            self::assertSame([], $manager->getMigrationHistory());
+        }
+    }
+
     public function testUnknownLegacyAnonymousStateStopsBeforeAnyMigrationSql(): void
     {
         $tracker = new \SymPress\WordPress\Migration\Infrastructure\MigrationTracker($this->database);

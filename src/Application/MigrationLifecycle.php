@@ -183,6 +183,33 @@ final readonly class MigrationLifecycle
         return $this->runOperation($pluginSlug, [], fn (): bool => $this->markMigratedUnlocked($pluginSlug, $migration));
     }
 
+    public function adoptLegacyMigration(PluginSlug $pluginSlug, MigrationContract $migration, string $legacyKey, string $expectedVersion): bool
+    {
+        $key = MigrationKey::forMigration($migration);
+        if (!str_contains($legacyKey, '@anonymous') || $legacyKey === $key || $expectedVersion === '') {
+            throw new \InvalidArgumentException(
+                'Adoption requires an exact anonymous legacy identity and its recorded version.',
+            );
+        }
+        return $this->runOperation($pluginSlug, [], function () use ($pluginSlug, $key, $legacyKey, $expectedVersion): bool {
+            $legacy = $this->store->findRecord($pluginSlug->value, $legacyKey);
+            $current = $this->store->findRecord($pluginSlug->value, $key);
+            if (
+                $legacy === null || $legacy->version !== $expectedVersion
+                || ($current !== null && $current->version !== $expectedVersion)
+            ) {
+                throw new \RuntimeException(
+                    'Legacy state does not match the reviewed version or conflicts with the stable identity.',
+                );
+            }
+            $record = new MigrationRecord($pluginSlug->value, $key, $legacy->version, $legacy->migratedAt);
+            if (!$this->store->saveRecord($record) || !$this->store->deleteRecord($pluginSlug->value, $legacyKey)) {
+                return false;
+            }
+            return $this->store->appendHistory($this->createExecution($record, 'adopt', $this->currentTimestamp()));
+        });
+    }
+
     private function markMigratedUnlocked(PluginSlug $pluginSlug, MigrationContract $migration): bool
     {
         $existingRecord = $this->recordForMigration($pluginSlug, $migration);

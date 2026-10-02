@@ -91,6 +91,29 @@ incomplete tests and runs on pull requests, main and the weekly schedule.
 
 ## Identity, deployment and table scoping
 
+`wp migration migrate` with no plugin catches failures per plugin, continues the
+remaining registrations and returns a nonzero aggregate result. Each individual
+plugin still stops at its first failed migration; no failed migration is marked
+applied. Failure diagnostics contain the plugin slug without SQL/credential data.
+
+An administrator can adopt one reviewed anonymous legacy record explicitly:
+
+```sh
+wp --user=<administrator> migration adopt <plugin> orm-schema:<manager> \
+  --legacy-base64=<base64-of-exact-stored-identity> \
+  --expected-version=<exact-recorded-version> --yes
+```
+
+Base64 transports PHP's NUL-separated identity unchanged. The target must be an
+exact registered stable key. Adoption validates the recorded version and any
+existing target under the operation lock, preserves that version/date, retires
+only the specified legacy current-state entry and appends `adopt` history.
+Historical entries remain unchanged. It runs no migration `up()` SQL and does not
+claim that a newer intended schema is applied; changed schema remains pending.
+Unknown/conflicting state fails. `manage_options` and explicit `--yes` are required
+by the CLI before metadata is touched. The lower-level manager method is available
+to trusted deployment tooling after equivalent operator authorization.
+
 Named migration classes keep their class identity unless they declare a stable
 `getMigrationKey(): string`. Anonymous migrations **require** that method;
 basename/line and release-directory heuristics cannot establish unique identity.
