@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 where applicable.
 
+## 1.0.4 — 2026-10-02
+
+- Resolve deferred schema SQL under the advisory lock, recheck applied state before planning, and release the lock on planning failures.
+- Add the backward-compatible deferred-operation executor contract used by ORM schema migrations.
+
 ## 1.0.3 — 2026-10-02
 
 ### Fixed
