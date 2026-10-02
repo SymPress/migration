@@ -29,7 +29,7 @@ jobs:
       mariadb:
         image: mariadb:11.8@sha256:efb4959ef2c835cd735dbc388eb9ad6aab0c78dd64febcd51bc17481111890c4
         env:
-          MARIADB_DATABASE: wordpress
+          MARIADB_DATABASE: sympress_review_migration_probe
           MARIADB_USER: wordpress
           MARIADB_PASSWORD: wordpress
           MARIADB_ROOT_PASSWORD: root
@@ -60,9 +60,9 @@ jobs:
           COMPOSER_AUTH: ${{ secrets.COMPOSER_AUTH_JSON }}
 
       - name: Probe WordPress database behavior
-        run: composer tests:database
+        run: composer tests:database -- --fail-on-skipped --fail-on-incomplete
         env:
-          WORDPRESS_DB_NAME: wordpress
+          WORDPRESS_DB_NAME: sympress_review_migration_probe
           WORDPRESS_DB_USER: wordpress
           WORDPRESS_DB_PASSWORD: wordpress
           WORDPRESS_DB_HOST: 127.0.0.1:3306
