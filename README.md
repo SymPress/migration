@@ -149,6 +149,7 @@ wp migration migrate
 wp migration migrate orders-plugin
 wp migration migrate orders-plugin 1.0.0
 wp migration run orders-plugin
+# Rollbacks require WordPress local/development; staging/production are blocked.
 wp migration rollback orders-plugin
 wp migration rollback orders-plugin --migration=CreateOrdersTableMigration
 wp migration execute orders-plugin CreateOrdersTableMigration --up
@@ -189,6 +190,7 @@ if ($manager === null) {
 
 $manager->syncMetadataStorage();
 $manager->migrateTo('1.0.0');
+$manager->migrateTo('1.0.0', allowRollback: false); // Forward-only target execution.
 $manager->executeMigration(CreateOrdersTableMigration::class, 'up');
 $manager->markMigration(CreateOrdersTableMigration::class, 'down');
 

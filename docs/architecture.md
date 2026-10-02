@@ -18,6 +18,25 @@ Forward migrations run in registration order. Rollbacks run in reverse
 registration order. A target identifies a registered version, full class name,
 or short class name. Processing stops on the first failed step.
 
+## CLI rollback boundary
+
+WP-CLI database rollback is allowed only when the loaded WordPress
+`wp_get_environment_type()` reports `local` or `development`. Production,
+staging, unknown values and an unavailable WordPress environment API fail
+closed. `wp migration rollback` (all plugins, one plugin or one migration),
+`execute --down`, and backward `migrate` targets (including the `run` alias)
+are blocked. No force flag bypasses the restriction. Forward migration and
+`execute --up` remain available in every environment.
+
+The CLI passes `allowRollback: false` to `MigrationManager::migrateTo()` in
+restricted environments. The manager rejects the actual backward branch before
+calling `down()` or deleting applied state, rather than trusting a separate CLI
+status check that could become stale. Concurrent forward work cannot turn this
+call into a rollback. The library default remains `allowRollback: true` for
+explicitly reviewed inverse migrations; direct library calls do not infer a
+WordPress environment. Metadata-only `version --add/--delete` remains an
+explicit reconciliation operation and does not execute migration SQL.
+
 ## State model
 
 - `{$wpdb->prefix}migrations` contains the current version for each

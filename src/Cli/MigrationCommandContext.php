@@ -22,6 +22,22 @@ final readonly class MigrationCommandContext
         return $this->registry ?? MigrationRegistry::getInstance();
     }
 
+    public function allowsRollback(): bool
+    {
+        return function_exists('wp_get_environment_type')
+            && in_array(wp_get_environment_type(), ['local', 'development'], true);
+    }
+
+    public function requireRollbackEnvironment(): void
+    {
+        if ($this->allowsRollback()) {
+            return;
+        }
+
+        WP_CLI::error('CLI database rollbacks require a loaded WordPress local or development environment. '
+            . 'They are disabled in production, staging and unknown environments.');
+    }
+
     public function tracker(): MigrationTracker
     {
         return new MigrationTracker($this->database());
