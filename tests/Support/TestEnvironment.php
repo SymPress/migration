@@ -25,6 +25,7 @@ namespace SymPress\WordPress\Migration\Tests\Support {
         public static array $cliCalls = [];
 
         public static string $currentTime = '2026-03-27 12:00:00';
+        public static string $environmentType = 'development';
 
         public static function reset(): void
         {
@@ -39,6 +40,7 @@ namespace SymPress\WordPress\Migration\Tests\Support {
                 'format_items' => [],
             ];
             self::$currentTime = '2026-03-27 12:00:00';
+            self::$environmentType = 'development';
         }
     }
 }
@@ -46,6 +48,13 @@ namespace SymPress\WordPress\Migration\Tests\Support {
 namespace {
 
     use SymPress\WordPress\Migration\Tests\Support\WordPressState;
+
+    if (!function_exists('wp_get_environment_type')) {
+        function wp_get_environment_type(): string
+        {
+            return WordPressState::$environmentType;
+        }
+    }
 
     if (!defined('ARRAY_A')) {
         define('ARRAY_A', 'ARRAY_A');

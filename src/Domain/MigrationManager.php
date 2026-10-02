@@ -116,7 +116,7 @@ class MigrationManager
         return $this->lifecycle->rollback($this->pluginSlug, $migration);
     }
 
-    public function migrateTo(?string $targetVersion = null): bool
+    public function migrateTo(?string $targetVersion = null, bool $allowRollback = true): bool
     {
         $this->assertLegacyIdentitiesAreMapped();
         if (!$this->lifecycle->ensureStorageIsReady()) {
@@ -139,7 +139,8 @@ class MigrationManager
             return $this->migrateForward(0, $targetIndex);
         }
 
-        return $this->rollbackBackward($currentIndex, $targetIndex + 1);
+        // Enforce at the branch that can invoke down(), not a CLI status preflight.
+        return $allowRollback && $this->rollbackBackward($currentIndex, $targetIndex + 1);
     }
 
     public function executeMigration(string $migrationClass, string $direction): bool

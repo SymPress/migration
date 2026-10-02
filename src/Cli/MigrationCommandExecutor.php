@@ -38,6 +38,7 @@ final readonly class MigrationCommandExecutor
      */
     public function rollback(array $args, array $assocArgs): void
     {
+        $this->context->requireRollbackEnvironment();
         $pluginSlug = $this->context->normalizeOptionalString($args[0] ?? null);
         $migrationClass = $this->context->normalizeOptionalString($assocArgs['migration'] ?? null);
 
@@ -58,6 +59,9 @@ final readonly class MigrationCommandExecutor
         $pluginSlug = $this->context->requirePluginSlug($args, 'execute');
         $migrationClass = $this->context->requireMigrationClass($args, 'execute');
         $direction = $this->resolveExecutionDirection($assocArgs);
+        if ($direction === 'down') {
+            $this->context->requireRollbackEnvironment();
+        }
         $manager = $this->context->managerOrFail($pluginSlug);
 
         if (!$manager->executeMigration($migrationClass, $direction)) {
@@ -143,8 +147,10 @@ final readonly class MigrationCommandExecutor
             WP_CLI::log(sprintf('Migrating "%s" to "%s"...', $pluginSlug, $target));
         }
 
-        if (!$manager->migrateTo($target)) {
-            WP_CLI::error(sprintf('Migration failed for "%s".', $pluginSlug));
+        $allowRollback = $this->context->allowsRollback();
+        if (!$manager->migrateTo($target, $allowRollback)) {
+            WP_CLI::error(sprintf('Migration failed for "%s".%s', $pluginSlug, $allowRollback ? ''
+                : ' CLI backward targets are disabled outside local or development WordPress environments.'));
         }
 
         if ($target === null) {

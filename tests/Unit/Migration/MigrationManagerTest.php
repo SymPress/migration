@@ -90,6 +90,37 @@ final class MigrationManagerTest extends TestCase
         self::assertCount(4, $this->manager->getMigrationHistory());
     }
 
+    public function testForwardOnlyTargetNeverInvokesRollbackAndLibraryDefaultRemainsCompatible(): void
+    {
+        WordPressState::$environmentType = 'production';
+        self::assertTrue($this->manager->migrateTo('1.0.1', false));
+        $state = $this->database->migrationRows;
+        $history = $this->database->migrationHistoryRows;
+        $this->database->executedStatements = [];
+        self::assertFalse($this->manager->migrateTo('1.0.0', false));
+        self::assertSame($state, $this->database->migrationRows);
+        self::assertSame($history, $this->database->migrationHistoryRows);
+        self::assertNotContains('ALTER TABLE wp_customers DROP INDEX idx_email;', $this->database->executedStatements);
+        self::assertTrue($this->manager->migrateTo('1.0.0'));
+        self::assertCount(1, $this->manager->getMigratedVersions());
+    }
+
+    public function testForwardOnlyTargetsApplyChangedSchemaHashesAndRejectBackwardStableKeys(): void
+    {
+        $schema = $this->identityMigration('schema', 'schema:old');
+        $later = $this->identityMigration('later', '1.0.0');
+        $manager = $this->createMigrationManager($this->database, [$schema, $later]);
+        self::assertTrue($manager->migrateTo(null, false));
+        $manager->replaceMigration($this->identityMigration('schema', 'schema:new'));
+        self::assertTrue($manager->migrateTo('later', false));
+        self::assertFalse($manager->hasPendingMigrations());
+        $history = $manager->getMigrationHistory();
+        self::assertFalse($manager->migrateTo('schema', false));
+        self::assertSame($history, $manager->getMigrationHistory());
+        self::assertCount(2, $manager->getMigratedVersions());
+        self::assertNotContains('SELECT down_later', $this->database->executedStatements);
+    }
+
     public function test_it_stops_rollback_when_a_migration_fails(): void
     {
         $this->manager->runMigrations();

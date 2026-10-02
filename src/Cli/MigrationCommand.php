@@ -88,10 +88,10 @@ final readonly class MigrationCommand
      * <migration>
      * : Migration FQCN or short class name.
      *
-     * --up
+     * [--up]
      * : Execute the migration up.
      *
-     * --down
+     * [--down]
      * : Execute the migration down.
      *
      * @param list<string> $args

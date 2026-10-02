@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 where applicable.
 
+## 1.0.3 — 2026-10-02
+
+### Fixed
+
+- Block WP-CLI database rollbacks and backward migration targets outside loaded
+  WordPress local/development environments, including missing environment APIs.
+- Enforce forward-only target execution inside the manager while preserving the
+  default library rollback API for explicitly reviewed inverse migrations.
+- Correct WP-CLI execution flag synopsis so `--up` and `--down` are recognized;
+  the executor continues to require exactly one direction.
+
 ## Unreleased
 
 ### Changed
