@@ -223,6 +223,7 @@ final class MigrationStatusCommand extends Command
     /** @param list<string> $values */
     private function csvLine(array $values): string
     {
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- CSV formatting needs a private temporary stream, not access to WordPress files.
         $handle = fopen('php://temp', 'r+');
 
         if (!is_resource($handle)) {
@@ -232,6 +233,7 @@ final class MigrationStatusCommand extends Command
         fputcsv($handle, $values, ',', '"', '\\');
         rewind($handle);
         $line = stream_get_contents($handle);
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- Close the temporary CSV-formatting stream.
         fclose($handle);
 
         return is_string($line) ? rtrim($line, "\r\n") : '';
