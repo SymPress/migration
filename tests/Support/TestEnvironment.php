@@ -137,6 +137,9 @@ namespace {
                 if (str_starts_with($query, 'SELECT GET_LOCK(') || str_starts_with($query, 'SELECT RELEASE_LOCK(')) {
                     return 1;
                 }
+                if ($query === 'SELECT CONNECTION_ID()' || str_starts_with($query, 'SELECT IS_USED_LOCK(')) {
+                    return 100;
+                }
 
                 if ($query === 'SELECT DATABASE()') {
                     return 'disposable';

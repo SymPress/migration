@@ -6,6 +6,7 @@ namespace SymPress\WordPress\Migration\Domain;
 
 use SymPress\WordPress\Migration\Application\MigrationLifecycle;
 use SymPress\WordPress\Migration\Contract\Migration as MigrationContract;
+use SymPress\WordPress\Migration\Exception\MigrationOperationException;
 use SymPress\WordPress\Migration\Value\MigrationExecution;
 use SymPress\WordPress\Migration\Value\MigrationKey;
 use SymPress\WordPress\Migration\Value\MigrationRecord;
@@ -180,7 +181,7 @@ class MigrationManager
         return false;
     }
 
-    public function adoptLegacyMigration(string $migrationKey, string $legacyKey, string $expectedVersion): bool
+    public function adoptLegacyMigration(string $migrationKey, string $legacyKey, string $expectedVersion, bool $retireSuperseded = false): bool
     {
         $migration = $this->getMigration($migrationKey);
         if ($migration === null || MigrationKey::forMigration($migration) !== $migrationKey) {
@@ -194,7 +195,7 @@ class MigrationManager
         if (!$this->lifecycle->ensureStorageIsReady()) {
             return false;
         }
-        return $this->lifecycle->adoptLegacyMigration($this->pluginSlug, $migration, $legacyKey, $expectedVersion);
+        return $this->lifecycle->adoptLegacyMigration($this->pluginSlug, $migration, $legacyKey, $expectedVersion, $retireSuperseded);
     }
 
     public function needsUpdate(string $migrationClass): bool
@@ -210,6 +211,9 @@ class MigrationManager
 
     public function hasPendingMigrations(): bool
     {
+        if ($this->getLegacyStateIssues() !== []) {
+            return true;
+        }
         foreach ($this->migrations->inRegistrationOrder() as $migration) {
             if ($this->lifecycle->needsUpdate($this->pluginSlug, $migration)) {
                 return true;
@@ -305,6 +309,7 @@ class MigrationManager
     /** @return list<array{class: class-string<MigrationContract>, name: string, version: string}> */
     public function getPendingMigrations(): array
     {
+        $this->assertLegacyIdentitiesAreMapped();
         $pending = [];
 
         foreach ($this->migrations->inRegistrationOrder() as $migration) {
@@ -389,21 +394,80 @@ class MigrationManager
         return array_first($matches);
     }
 
-    private function assertLegacyIdentitiesAreMapped(): void
+    /**
+     * @return list<array{migration: string, legacy_base64: string, version: string, reason: string, command: string}>
+     */
+    public function getLegacyStateIssues(): array
     {
         $known = [];
+        $records = [];
+        foreach ($this->lifecycle->recordsForPlugin($this->pluginSlug) as $record) {
+            $records[$record->migration] = $record;
+        }
+        $conflicts = [];
 
         foreach ($this->migrations as $migration) {
-            foreach (MigrationKey::identities($migration) as $identity) {
-                $known[$identity] = true;
+            $identities = MigrationKey::identities($migration);
+            $versions = [];
+            foreach ($identities as $identity) {
+                $known[$identity] = MigrationKey::forMigration($migration);
+                if (!isset($records[$identity])) {
+                    continue;
+                }
+                $versions[] = $records[$identity]->version;
+            }
+            if (count(array_unique($versions)) <= 1) {
+                continue;
+            }
+            foreach ($identities as $identity) {
+                $conflicts[$identity] = true;
             }
         }
-
-        foreach ($this->lifecycle->recordsForPlugin($this->pluginSlug) as $record) {
-            if (str_contains($record->migration, '@anonymous') && !isset($known[$record->migration])) {
-                throw new \RuntimeException('Unmapped legacy anonymous migration state. '
-                    . 'Supply its exact recorded identity in getLegacyMigrationKeys() before executing migrations.');
+        $issues = [];
+        foreach ($records as $record) {
+            if (
+                !str_contains($record->migration, '@anonymous')
+                || (isset($known[$record->migration]) && !isset($conflicts[$record->migration]))
+            ) {
+                continue;
             }
+            $stable = $known[$record->migration] ?? '<stable-key>';
+            $issues[] = $this->legacyStateIssue(
+                $record,
+                $stable,
+                isset($records[$stable]),
+                isset($conflicts[$record->migration]),
+            );
+        }
+        return $issues;
+    }
+
+    /** @return array{migration: string, legacy_base64: string, version: string, reason: string, command: string} */
+    private function legacyStateIssue(MigrationRecord $record, string $stable, bool $retire, bool $conflict): array
+    {
+        // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Exact binary identity transport.
+        $encoded = base64_encode($record->migration);
+        return [
+            'migration' => $record->migration,
+            'legacy_base64' => $encoded,
+            'version' => $record->version,
+            'reason' => $conflict ? 'Conflicting legacy versions' : 'Unmapped legacy identity',
+            'command' => sprintf(
+                'wp migration adopt %s %s --legacy-base64=%s --expected-version=%s%s --yes --user=<administrator>',
+                escapeshellarg($this->pluginSlug->value),
+                escapeshellarg($stable),
+                escapeshellarg($encoded),
+                escapeshellarg($record->version),
+                $retire ? ' --retire-superseded' : '',
+            ),
+        ];
+    }
+
+    private function assertLegacyIdentitiesAreMapped(): void
+    {
+        if ($this->getLegacyStateIssues() !== []) {
+            throw new MigrationOperationException('Unmapped legacy or conflicting migration state. '
+                . 'Inspect wp migration status and adopt the exact reviewed identities before executing migrations.');
         }
     }
 

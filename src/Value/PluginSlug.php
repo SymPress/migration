@@ -31,8 +31,8 @@ final class PluginSlug
     {
         $normalizedPluginSlug = strtolower(trim($pluginSlug));
 
-        if ($normalizedPluginSlug === '') {
-            throw new \InvalidArgumentException('Plugin slug must not be empty.');
+        if ($normalizedPluginSlug === '' || strlen($normalizedPluginSlug) > 191) {
+            throw new \InvalidArgumentException('Plugin slug must contain between 1 and 191 bytes.');
         }
 
         if (preg_match('/^[a-z0-9][a-z0-9_-]*$/', $normalizedPluginSlug) === 1) {

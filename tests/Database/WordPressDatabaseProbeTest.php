@@ -136,7 +136,7 @@ final class WordPressDatabaseProbeTest extends TestCase
             }
             $other = new \wpdb(DB_USER, DB_PASSWORD, DB_NAME, DB_HOST);
             $databaseName = $this->database->get_var('SELECT DATABASE()');
-            $lock = 'sympress-migration:' . substr(hash('sha256', $databaseName . ':' . $this->database->prefix . ':db-probe'), 0, 40);
+            $lock = 'sympress-migration:' . substr(hash('sha256', $databaseName), 0, 40);
             self::assertTrue($executor->runOperation('db-probe', [], static fn (): bool => $other->get_var($other->prepare('SELECT GET_LOCK(%s, 0)', $lock)) === '0'));
             self::assertSame('1', $other->get_var($other->prepare('SELECT GET_LOCK(%s, 0)', $lock)));
             $other->get_var($other->prepare('SELECT RELEASE_LOCK(%s)', $lock));
@@ -168,6 +168,61 @@ final class WordPressDatabaseProbeTest extends TestCase
         } finally {
             $this->database->suppress_errors(false);
         }
+    }
+
+    public function testDifferentPluginScopesAndPrefixesCannotWriteTheSameDatabaseConcurrently(): void
+    {
+        $executor = new WordPressSqlExecutor($this->database, 0);
+        $other = new \wpdb(DB_USER, DB_PASSWORD, DB_NAME, DB_HOST);
+        $other->prefix = 'another_site_';
+        $competing = new WordPressSqlExecutor($other, 0);
+        $called = false;
+        self::assertTrue($executor->runOperation('plugin-one', [], function () use ($competing, &$called): bool {
+            self::assertFalse($competing->runOperation('plugin-two-custom-table', [], static function () use (&$called): bool {
+                $called = true;
+                return true;
+            }));
+            return true;
+        }));
+        self::assertFalse($called, 'A blocked worker cannot plan or write shared tables.');
+        self::assertTrue($competing->runOperation('metadata', [], static fn (): bool => true));
+    }
+
+    public function testActualConnectionReplacementStopsBeforeSqlAndMetadataWrites(): void
+    {
+        $executor = new WordPressSqlExecutor($this->database);
+        self::assertTrue($executor->execute("CREATE TABLE {$this->table} (id bigint NOT NULL, PRIMARY KEY  (id)) ENGINE=InnoDB"));
+        $tracker = new MigrationTracker($this->database);
+        self::assertTrue($tracker->ensureTableExists());
+        try {
+            $executor->runDeferredOperation('reconnect', function (): array {
+                self::assertTrue($this->database->close());
+                self::assertTrue($this->database->db_connect(false));
+                return ["INSERT INTO {$this->table} (id) VALUES (1)"];
+            }, fn (array $sql): bool => $executor->execute($sql));
+            self::fail('Replacement sessions must not write migration SQL.');
+        } catch (\SymPress\WordPress\Migration\Exception\MigrationOperationException) {
+            self::assertSame('0', $this->database->get_var("SELECT COUNT(*) FROM {$this->table}"));
+        }
+        try {
+            $executor->runOperation('metadata', [], function () use ($tracker): bool {
+                self::assertTrue($this->database->close());
+                self::assertTrue($this->database->db_connect(false));
+                return $tracker->record('reconnected', 'stable', '1.0.0');
+            });
+            self::fail('Replacement sessions must not write migration metadata.');
+        } catch (\SymPress\WordPress\Migration\Exception\MigrationOperationException) {
+            self::assertSame([], $tracker->findRecordsForPlugin('reconnected'));
+        }
+    }
+
+    public function testStorageRejectsAnIdentityAbove191BytesBeforeCreatingTables(): void
+    {
+        $tracker = new MigrationTracker($this->database);
+        self::assertTrue($tracker->record('byte-limit', str_repeat('x', 191), '1.0.0'));
+        self::assertSame('1.0.0', $tracker->getVersion('byte-limit', str_repeat('x', 191)));
+        $this->expectException(\InvalidArgumentException::class);
+        $tracker->record('byte-limit', str_repeat('x', 192), '2.0.0');
     }
 
     public function testIdentityUpgradeAndRollbackAreAtomicAndKeepHistory(): void

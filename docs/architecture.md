@@ -58,7 +58,16 @@ Custom executors can implement the additive
 `DeferredMigrationOperationExecutor` contract for this behavior; the original
 `MigrationOperationExecutor` and `MigrationSqlExecutor` contracts remain valid
 with their previous semantics. The WordPress executor implements both operation
-contracts. The lock includes database, WordPress prefix and plugin scope.
+contracts. All plugins, WordPress prefixes, shared ORM tables and custom metadata
+tables in one database share the same advisory lock domain. Configure
+`migration.lock_timeout` before bootstrap (default 10 seconds, 0–3600), or pass
+`lockTimeout` to a standalone `WordPressSqlExecutor` or `MigrationSystem`.
+Nested operations on the same wpdb connection reuse ownership and transaction
+depth. SQL and metadata writers verify the original connection ID and
+`IS_USED_LOCK()` ownership before writes. A replaced/reconnected session stops
+with `MigrationOperationException`; it cannot continue under a lost lock.
+The executor also checks after SQL: a reconnect inside wpdb's own automatic
+query retry can already have applied SQL, so reconcile state before retrying.
 DML-only operations use a transaction spanning SQL, state and history on
 transactional tables. State/history writes also use a transaction after DDL.
 MySQL/MariaDB DDL can commit independently and is never claimed to be atomic.
@@ -110,6 +119,17 @@ existing target under the operation lock, preserves that version/date, retires
 only the specified legacy current-state entry and appends `adopt` history.
 Historical entries remain unchanged. It runs no migration `up()` SQL and does not
 claim that a newer intended schema is applied; changed schema remains pending.
+If the stable identity already exists, another adoption requires explicit
+`--retire-superseded`. This removes only the selected reviewed legacy record,
+retains the stable version/date, and appends `retire` history with the exact
+retired identity/version. It never replaces a stable record with an older
+version. Review each additional old deployment separately, including records
+whose versions happen to match. Different mapped legacy versions, including a
+canonical-plus-alias conflict, remain blocked until explicitly reconciled.
+`wp migration status` reports `Needs Adoption`, the exact binary key as Base64,
+its recorded version and a `wp migration adopt` command template. Replace the
+stable-key placeholder and administrator after review. Status never reports
+such state as up to date, even when no ordinary migrations are pending.
 Unknown/conflicting state fails. `manage_options` and explicit `--yes` are required
 by the CLI before metadata is touched. The lower-level manager method is available
 to trusted deployment tooling after equivalent operator authorization.
@@ -117,7 +137,9 @@ to trusted deployment tooling after equivalent operator authorization.
 Named migration classes keep their class identity unless they declare a stable
 `getMigrationKey(): string`. Anonymous migrations **require** that method;
 basename/line and release-directory heuristics cannot establish unique identity.
-Explicit keys must be non-empty, contain no NUL and fit 255 bytes. The ORM bridge
+Explicit keys must be non-empty, contain no NUL and fit 191 bytes, matching the
+metadata tables. Named-class keys, legacy aliases and plugin slugs have the same
+191-byte limit, checked before writes. The ORM bridge
 uses `orm-schema:<manager>`. Versions remain separate from keys. Collections are
 indexed by these keys, support multiple instances of an anonymous declaration
 with distinct keys, and reject overlapping keys/legacy aliases before execution.
@@ -140,6 +162,13 @@ Saving a new current version or marking it up retires mapped obsolete applied
 keys in the same metadata transaction and retains append-only history. Rollback
 and mark-down remove all applied aliases, so old state cannot reappear. Multiple
 legacy aliases with conflicting versions require explicit reconciliation.
+
+Expected operational state failures use `MigrationOperationException`. The
+all-plugin CLI catches this type and returned failures, processes the remaining
+plugins and exits unsuccessfully. PHP errors and other programming exceptions
+propagate immediately; custom migration implementations should use the typed
+exception only for reviewed operational failures. Exception details are omitted
+from aggregate CLI diagnostics to avoid leaking SQL or credentials.
 An up-to-date legacy record remains valid; `mark up` can explicitly move it to
 the canonical key without executing SQL. Forward targets rescan all pending
 migrations through that target in registration order, including changed earlier

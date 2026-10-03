@@ -31,9 +31,9 @@ final class MigrationServiceFactory
         return MigrationRegistry::getInstance();
     }
 
-    public static function system(\wpdb $database): MigrationSystem
+    public static function system(\wpdb $database, int $lockTimeout = 10): MigrationSystem
     {
-        return MigrationSystem::bootstrap($database);
+        return MigrationSystem::bootstrap($database, lockTimeout: $lockTimeout);
     }
 
     public static function tracker(MigrationSystem $system): MigrationTracker

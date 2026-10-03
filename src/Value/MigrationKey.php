@@ -13,8 +13,8 @@ final class MigrationKey
         if (method_exists($migration, 'getMigrationKey')) {
             $key = $migration->getMigrationKey();
 
-            if (!is_string($key) || $key === '' || strlen($key) > 255 || str_contains($key, "\0")) {
-                throw new \InvalidArgumentException('Migration keys must be non-empty strings of at most 255 bytes.');
+            if (!is_string($key) || $key === '' || strlen($key) > 191 || str_contains($key, "\0")) {
+                throw new \InvalidArgumentException('Migration keys must be non-empty strings of at most 191 bytes.');
             }
 
             return $key;
@@ -31,7 +31,15 @@ final class MigrationKey
             );
         }
 
+        self::assertStorageIdentity($class);
         return $class;
+    }
+
+    public static function assertStorageIdentity(string $key): void
+    {
+        if ($key === '' || strlen($key) > 191) {
+            throw new \InvalidArgumentException('Migration identities must be non-empty strings of at most 191 bytes.');
+        }
     }
 
     /** @return non-empty-list<string> */
@@ -54,9 +62,9 @@ final class MigrationKey
             }
 
             foreach ($aliases as $alias) {
-                if (!is_string($alias) || $alias === '' || strlen($alias) > 255) {
+                if (!is_string($alias) || $alias === '' || strlen($alias) > 191) {
                     throw new \InvalidArgumentException(
-                        'Legacy migration keys must be non-empty strings of at most 255 bytes.',
+                        'Legacy migration keys must be non-empty strings of at most 191 bytes.',
                     );
                 }
 
@@ -64,6 +72,9 @@ final class MigrationKey
             }
         }
 
+        foreach ($identities as $identity) {
+            self::assertStorageIdentity($identity);
+        }
         return array_values(array_unique($identities));
     }
 }

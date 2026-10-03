@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace SymPress\WordPress\Migration\Cli;
 
 use SymPress\WordPress\Migration\Domain\MigrationManager;
+use SymPress\WordPress\Migration\Exception\MigrationOperationException;
+use SymPress\WordPress\Migration\Infrastructure\WordPressSqlExecutor;
 use WP_CLI;
 
 final readonly class MigrationCommandExecutor
@@ -123,7 +125,9 @@ final readonly class MigrationCommandExecutor
             return;
         }
 
-        if (!$this->context->tracker()->ensureTableExists()) {
+        $tracker = $this->context->tracker();
+        $executor = new WordPressSqlExecutor($this->context->database());
+        if (!$executor->runOperation('metadata', ['CREATE TABLE'], $tracker->ensureTableExists(...))) {
             WP_CLI::error('Failed to sync metadata storage.');
         }
 
@@ -184,7 +188,7 @@ final readonly class MigrationCommandExecutor
                     WP_CLI::success(sprintf('Completed migrations for "%s".', $slug));
                     continue;
                 }
-            } catch (\Throwable) {
+            } catch (MigrationOperationException) {
                 // Keep SQL, credentials and exception messages out of the CLI diagnostic.
             }
             $failed++;

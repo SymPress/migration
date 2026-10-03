@@ -22,4 +22,11 @@ final class PluginSlugTest extends TestCase
 
         PluginSlug::fromString('My Plugin!');
     }
+
+    public function testPluginSlugMatchesThe191ByteSqlStorageLimit(): void
+    {
+        self::assertSame(str_repeat('p', 191), PluginSlug::fromString(str_repeat('p', 191))->value);
+        $this->expectException(\InvalidArgumentException::class);
+        PluginSlug::fromString(str_repeat('p', 192));
+    }
 }

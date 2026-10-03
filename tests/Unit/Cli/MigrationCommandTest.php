@@ -67,7 +67,7 @@ final class MigrationCommandTest extends TestCase
                 public function hasPendingMigrations(): bool { return true; }
                 public function runMigrations(): bool
                 {
-                    if ($this->mode === 'throws') { throw new \RuntimeException('credentialSentinel'); }
+                    if ($this->mode === 'throws') { throw new \SymPress\WordPress\Migration\Exception\MigrationOperationException('credentialSentinel'); }
                     return false;
                 }
             };
@@ -97,6 +97,29 @@ final class MigrationCommandTest extends TestCase
             }
         }
         self::assertFalse($this->database->hasTable('wp_migrations'));
+    }
+
+    public function testAllPluginsPropagatesProgrammingErrorsBeforeRunningOtherPlugins(): void
+    {
+        $registry = MigrationRegistry::getInstance();
+        $registry->clear();
+        $broken = new class ($this->database) extends MigrationManager {
+            public function __construct(\wpdb $database)
+            {
+                parent::__construct(\SymPress\WordPress\Migration\Value\PluginSlug::fromString('broken'), new \SymPress\WordPress\Migration\Application\MigrationLifecycle(new \SymPress\WordPress\Migration\Infrastructure\MigrationTracker($database), new \SymPress\WordPress\Migration\Infrastructure\WordPressSqlExecutor($database)));
+            }
+            public function hasPendingMigrations(): bool { throw new \TypeError('programming error'); }
+        };
+        $registry->set('broken', $broken);
+        $registry->set('my-plugin', $this->manager);
+        try {
+            $this->command->migrate([]);
+            self::fail('Programming errors must stop the command.');
+        } catch (\TypeError $exception) {
+            self::assertSame('programming error', $exception->getMessage());
+            self::assertSame([], $this->manager->getMigratedVersions());
+            self::assertSame([], WordPressState::$cliCalls['warning']);
+        }
     }
 
     public function testAdministratorCanAdoptTheExactBinaryLegacyIdentityWithoutExecutingSql(): void

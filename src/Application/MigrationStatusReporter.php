@@ -22,7 +22,8 @@ final readonly class MigrationStatusReporter
      *     migrated: int,
      *     pending: int,
      *     executions: int,
-     *     status: string
+     *     status: string,
+     *     diagnostic: string
      * }>
      */
     public function all(): array
@@ -45,9 +46,11 @@ final readonly class MigrationStatusReporter
      *         migrated: int,
      *         pending: int,
      *         executions: int,
-     *         status: string
+     *         status: string,
+     *         diagnostic: string
      *     },
      *     pending_migrations: list<array{class: string, name: string, version: string}>,
+     *     legacy_issues: list<array<string, string>>,
      *     recent_history: list<array{
      *         plugin: string,
      *         migration: string,
@@ -68,7 +71,8 @@ final readonly class MigrationStatusReporter
 
         return [
             'overview'           => $this->overview($pluginSlug, $manager),
-            'pending_migrations' => $manager->getPendingMigrations(),
+            'pending_migrations' => $manager->getLegacyStateIssues() === [] ? $manager->getPendingMigrations() : [],
+            'legacy_issues'      => $manager->getLegacyStateIssues(),
             'recent_history'     => array_slice($this->historyRows($manager), 0, 10),
         ];
     }
@@ -81,12 +85,14 @@ final readonly class MigrationStatusReporter
      *     migrated: int,
      *     pending: int,
      *     executions: int,
-     *     status: string
+     *     status: string,
+     *     diagnostic: string
      * }
      */
     private function overview(string $pluginSlug, MigrationManager $manager): array
     {
-        $current = $manager->getCurrentMigration();
+        $issues = $manager->getLegacyStateIssues();
+        $current = $issues === [] ? $manager->getCurrentMigration() : null;
         $latest = $manager->getLatestMigration();
 
         return [
@@ -94,9 +100,10 @@ final readonly class MigrationStatusReporter
             'current'    => $current['version'] ?? 'none',
             'latest'     => $latest['version'] ?? 'none',
             'migrated'   => count($manager->getMigratedVersions()),
-            'pending'    => count($manager->getPendingMigrations()),
+            'pending'    => $issues === [] ? count($manager->getPendingMigrations()) : 0,
             'executions' => count($manager->getMigrationHistory()),
-            'status'     => $manager->isUpToDate() ? 'Up to Date' : 'Pending',
+            'status'     => $issues !== [] ? 'Needs Adoption' : ($manager->isUpToDate() ? 'Up to Date' : 'Pending'),
+            'diagnostic' => implode("\n", array_column($issues, 'command')),
         ];
     }
 
