@@ -26,13 +26,14 @@ final class MigrationSystem
         \wpdb $database,
         ?MigrationTracker $tracker = null,
         ?MigrationManagerFactory $migrationManagerFactory = null,
+        int $lockTimeout = 10,
     ) {
 
         $this->tracker = $tracker ?? new MigrationTracker($database);
         $this->migrationManagerFactory = $migrationManagerFactory ?? new MigrationManagerFactory(
             new MigrationLifecycle(
                 $this->getTracker(),
-                new WordPressSqlExecutor($database),
+                new WordPressSqlExecutor($database, $lockTimeout),
             ),
         );
     }
@@ -46,10 +47,11 @@ final class MigrationSystem
         \wpdb $database,
         ?MigrationTracker $tracker = null,
         ?MigrationManagerFactory $migrationManagerFactory = null,
+        int $lockTimeout = 10,
     ): self {
 
         if (self::$instance === null) {
-            self::$instance = new self($database, $tracker, $migrationManagerFactory);
+            self::$instance = new self($database, $tracker, $migrationManagerFactory, $lockTimeout);
         }
 
         return self::$instance;

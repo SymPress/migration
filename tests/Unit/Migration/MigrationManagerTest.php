@@ -353,6 +353,50 @@ final class MigrationManagerTest extends TestCase
         }
     }
 
+    public function testFurtherAdoptionRequiresExplicitRetirementAndNeverChangesStableVersion(): void
+    {
+        $tracker = new \SymPress\WordPress\Migration\Infrastructure\MigrationTracker($this->database);
+        $first = "Migration@anonymous\0/old/first.php:40";
+        $second = "Migration@anonymous\0/old/second.php:40";
+        self::assertTrue($tracker->record('my-plugin', $first, '2.0.0'));
+        self::assertTrue($tracker->record('my-plugin', $second, '1.0.0'));
+        $manager = $this->createMigrationManager($this->database, [$this->identityMigration('stable', '2.0.0')]);
+        self::assertTrue($manager->adoptLegacyMigration('stable', $first, '2.0.0'));
+        try {
+            $manager->adoptLegacyMigration('stable', $second, '1.0.0');
+            self::fail('Additional state cannot be merged silently.');
+        } catch (\SymPress\WordPress\Migration\Exception\MigrationOperationException) {
+            self::assertSame('1.0.0', $tracker->getVersion('my-plugin', $second));
+            self::assertSame('2.0.0', $tracker->getVersion('my-plugin', 'stable'));
+        }
+        self::assertTrue($manager->adoptLegacyMigration('stable', $second, '1.0.0', true));
+        self::assertNull($tracker->getVersion('my-plugin', $second));
+        self::assertSame('2.0.0', $tracker->getVersion('my-plugin', 'stable'));
+        self::assertSame(['retire', 'adopt'], array_column($manager->getMigrationHistory(), 'direction'));
+        self::assertSame($second, $manager->getMigrationHistory()[0]['migration']);
+    }
+
+    public function testCanonicalStateDoesNotHideConflictingMappedLegacyVersion(): void
+    {
+        $legacy = "Migration@anonymous\0/old/release.php:40";
+        $tracker = new \SymPress\WordPress\Migration\Infrastructure\MigrationTracker($this->database);
+        self::assertTrue($tracker->record('my-plugin', 'stable', '2.0.0'));
+        self::assertTrue($tracker->record('my-plugin', $legacy, '1.0.0'));
+        $manager = $this->createMigrationManager($this->database, [$this->identityMigration('stable', '2.0.0', [$legacy])]);
+        self::assertFalse($manager->isUpToDate());
+        self::assertSame($legacy, $manager->getLegacyStateIssues()[0]['migration']);
+        self::assertStringContainsString('--retire-superseded', $manager->getLegacyStateIssues()[0]['command']);
+        $this->expectException(\SymPress\WordPress\Migration\Exception\MigrationOperationException::class);
+        $manager->runMigrations();
+    }
+
+    public function testMigrationKeysUseThe191ByteStorageLimitBeforeAnyWrites(): void
+    {
+        self::assertCount(1, $this->createMigrationManager($this->database, [$this->identityMigration(str_repeat('x', 191), '1.0.0')])->all());
+        $this->expectException(\InvalidArgumentException::class);
+        $this->createMigrationManager($this->database, [$this->identityMigration(str_repeat('x', 192), '1.0.0')]);
+    }
+
     public function testUnknownLegacyAnonymousStateStopsBeforeAnyMigrationSql(): void
     {
         $tracker = new \SymPress\WordPress\Migration\Infrastructure\MigrationTracker($this->database);

@@ -87,4 +87,22 @@ final class MigrationStatusCommandTest extends TestCase
     {
         return new MigrationStatusCommand(new MigrationStatusReporter(MigrationRegistry::getInstance()));
     }
+
+    public function testStatusExposesExactLegacyIdentityAndAdoptionCommand(): void
+    {
+        $legacy = "Migration@anonymous\0/old/release.php:40";
+        $tracker = new \SymPress\WordPress\Migration\Infrastructure\MigrationTracker($this->database);
+        self::assertTrue($tracker->record('my-plugin', $legacy, 'schema:old'));
+        self::assertFalse($this->manager->isUpToDate());
+        $tester = new CommandTester($this->command());
+        $tester->execute(['plugin' => 'my-plugin', '--format' => 'json']);
+        $report = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('Needs Adoption', $report['overview']['status']);
+        self::assertSame($legacy, $report['legacy_issues'][0]['migration']);
+        self::assertSame(base64_encode($legacy), $report['legacy_issues'][0]['legacy_base64']);
+        self::assertStringContainsString('wp migration adopt', $report['legacy_issues'][0]['command']);
+        self::assertStringContainsString('--expected-version=', $report['overview']['diagnostic']);
+        self::assertSame(Command::FAILURE, $tester->execute(['plugin' => 'my-plugin']));
+        self::assertStringContainsString(base64_encode($legacy), $tester->getDisplay());
+    }
 }

@@ -271,6 +271,16 @@ final readonly class MigrationCommandReporter
         WP_CLI::log(sprintf('Pending: %d', $overview['pending']));
         WP_CLI::log(sprintf('Executions: %d', $overview['executions']));
 
+        if ($report['legacy_issues'] !== []) {
+            WP_CLI::warning('Legacy migration state requires explicit review and adoption.');
+            \WP_CLI\Utils\format_items(
+                $format,
+                $report['legacy_issues'],
+                ['legacy_base64', 'version', 'reason', 'command'],
+            );
+            return;
+        }
+
         if ($verbose && $report['pending_migrations'] !== []) {
             WP_CLI::log("\nPending migrations:");
             \WP_CLI\Utils\format_items($format, $report['pending_migrations'], ['class', 'name', 'version']);
@@ -305,7 +315,7 @@ final readonly class MigrationCommandReporter
         \WP_CLI\Utils\format_items(
             $format,
             $rows,
-            ['plugin', 'current', 'latest', 'migrated', 'pending', 'executions', 'status'],
+            ['plugin', 'current', 'latest', 'migrated', 'pending', 'executions', 'status', 'diagnostic'],
         );
     }
 

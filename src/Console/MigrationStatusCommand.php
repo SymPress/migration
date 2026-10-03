@@ -28,6 +28,7 @@ final class MigrationStatusCommand extends Command
         'pending',
         'executions',
         'status',
+        'diagnostic',
     ];
 
     public function __construct(
@@ -69,7 +70,7 @@ final class MigrationStatusCommand extends Command
 
         $this->renderRows($output, $rows, self::OVERVIEW_HEADERS, $format);
 
-        return Command::SUCCESS;
+        return in_array('Needs Adoption', array_column($rows, 'status'), true) ? Command::FAILURE : Command::SUCCESS;
     }
 
     private function renderPluginStatus(
@@ -91,7 +92,7 @@ final class MigrationStatusCommand extends Command
         if ($format !== 'table') {
             $this->renderStructured($output, $report, $format);
 
-            return Command::SUCCESS;
+            return $report['legacy_issues'] === [] ? Command::SUCCESS : Command::FAILURE;
         }
 
         /** @var array<string, string|int> $overview */
@@ -105,6 +106,17 @@ final class MigrationStatusCommand extends Command
             ['Pending' => (string) $overview['pending']],
             ['Executions' => (string) $overview['executions']],
         );
+
+        if ($report['legacy_issues'] !== []) {
+            $io->warning('Legacy migration state requires explicit review and adoption.');
+            $this->renderRows(
+                $output,
+                $report['legacy_issues'],
+                ['legacy_base64', 'version', 'reason', 'command'],
+                'table',
+            );
+            return Command::FAILURE;
+        }
 
         if ($output->isVerbose() && $report['pending_migrations'] !== []) {
             $io->section('Pending migrations');

@@ -78,4 +78,57 @@ final class WordPressSqlExecutorTest extends TestCase
         self::assertFalse($database->locked);
         self::assertSame([], $database->executedStatements);
     }
+
+    public function testPluginsPrefixesAndMetadataShareOneLockAndNestedExecutorsReuseOwnership(): void
+    {
+        $database = new class extends \wpdb {
+            /** @var list<string> */ public array $locks = [];
+            public function get_var(string $query): string|int|null
+            {
+                if (str_starts_with($query, 'SELECT GET_LOCK(')) { $this->locks[] = $query; }
+                return parent::get_var($query);
+            }
+        };
+        $executor = new WordPressSqlExecutor($database, 0);
+        self::assertTrue($executor->runOperation('plugin-one', [], fn (): bool => (new WordPressSqlExecutor($database))->runOperation('metadata', [], static fn (): bool => true)));
+        self::assertCount(1, $database->locks);
+        $database->prefix = 'other_';
+        self::assertTrue($executor->runOperation('plugin-two', [], static fn (): bool => true));
+        self::assertSame($database->locks[0], $database->locks[1]);
+        self::assertStringContainsString(', 0)', $database->locks[0]);
+    }
+
+    public function testReconnectedSessionIsRejectedBeforeSqlAndMetadataWrites(): void
+    {
+        $database = new class extends \wpdb {
+            public int $session = 100;
+            public function get_var(string $query): string|int|null
+            {
+                return $query === 'SELECT CONNECTION_ID()' ? $this->session : parent::get_var($query);
+            }
+        };
+        $GLOBALS['wpdb'] = $database;
+        $executor = new WordPressSqlExecutor($database);
+        try {
+            $executor->runDeferredOperation('shared-table', function () use ($database): array {
+                $database->session = 101;
+                return ['ALTER TABLE wp_shared ADD COLUMN stale int'];
+            }, fn (array $sql): bool => $executor->execute($sql));
+            self::fail('A reconnected session cannot write migration SQL.');
+        } catch (\SymPress\WordPress\Migration\Exception\MigrationOperationException) {
+            self::assertSame([], $database->executedStatements);
+        }
+        $database->session = 100;
+        $tracker = new \SymPress\WordPress\Migration\Infrastructure\MigrationTracker($database);
+        self::assertTrue($tracker->ensureTableExists());
+        try {
+            $executor->runOperation('metadata', [], function () use ($database, $tracker): bool {
+                $database->session = 101;
+                return $tracker->record('plugin', 'stable', '1.0.0');
+            });
+            self::fail('A reconnected session cannot write metadata.');
+        } catch (\SymPress\WordPress\Migration\Exception\MigrationOperationException) {
+            self::assertSame([], $tracker->findRecordsForPlugin('plugin'));
+        }
+    }
 }

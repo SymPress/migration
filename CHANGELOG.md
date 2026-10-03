@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 where applicable.
 
+## Unreleased
+
+- Require explicit retirement for additional legacy adoptions without changing the canonical version; expose exact adoption diagnostics in status and reject canonical/alias version conflicts.
+- Validate migration identities and plugin slugs against the 191-byte metadata storage limit before writes.
+- Share advisory locks across all migration scopes in a database, configure the timeout, and verify connection/lock ownership before SQL and metadata writes.
+- Continue other plugins only after typed operational failures; propagate PHP/programming errors immediately.
+
 ## 1.0.7 — 2026-10-02
 
 - Continue other plugins after a failed migration, then return a failing aggregate CLI result.

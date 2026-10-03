@@ -142,6 +142,8 @@ final readonly class MigrationCommand
      * : Exact version already recorded for the old identity.
      * --yes
      * : Confirm the reviewed metadata adoption.
+     * [--retire-superseded]
+     * : Retire an additional reviewed legacy record while retaining the existing stable version.
      *
      * @param list<string> $args
      * @param array<string, scalar|null> $assocArgs
@@ -163,7 +165,14 @@ final readonly class MigrationCommand
         }
         $context = new MigrationCommandContext($this->registry);
         $manager = $context->managerOrFail($context->requirePluginSlug($args, 'adopt'));
-        if (!$manager->adoptLegacyMigration($context->requireMigrationClass($args, 'adopt'), $legacy, $version)) {
+        if (
+            !$manager->adoptLegacyMigration(
+                $context->requireMigrationClass($args, 'adopt'),
+                $legacy,
+                $version,
+                isset($assocArgs['retire-superseded']),
+            )
+        ) {
             \WP_CLI::error('Legacy adoption failed; reconcile metadata before retrying.');
         }
         \WP_CLI::success('Legacy identity adopted; recorded version and existing history retained.');

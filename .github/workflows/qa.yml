@@ -12,10 +12,10 @@ permissions:
 
 jobs:
   workflows:
-    uses: sympress/workflows/.github/workflows/lint-workflows.yml@177fa0d727b278d2103052ec77c102b4a4c492a0
+    uses: sympress/workflows/.github/workflows/lint-workflows.yml@78d083a9a0176cf0252318b0c69fc64938a727d6
 
   qa:
-    uses: sympress/workflows/.github/workflows/sympress-qa.yml@177fa0d727b278d2103052ec77c102b4a4c492a0
+    uses: sympress/workflows/.github/workflows/sympress-qa.yml@78d083a9a0176cf0252318b0c69fc64938a727d6
     with:
       php_version: '8.5'
     secrets:

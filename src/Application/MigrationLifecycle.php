@@ -9,6 +9,7 @@ use SymPress\WordPress\Migration\Contract\Migration as MigrationContract;
 use SymPress\WordPress\Migration\Contract\MigrationOperationExecutor;
 use SymPress\WordPress\Migration\Contract\MigrationSqlExecutor;
 use SymPress\WordPress\Migration\Contract\MigrationStore;
+use SymPress\WordPress\Migration\Exception\MigrationOperationException;
 use SymPress\WordPress\Migration\Value\MigrationExecution;
 use SymPress\WordPress\Migration\Value\MigrationKey;
 use SymPress\WordPress\Migration\Value\MigrationRecord;
@@ -155,17 +156,13 @@ final readonly class MigrationLifecycle
                 continue;
             }
 
-            if ($identity === MigrationKey::forMigration($migration)) {
-                return $record;
-            }
-
             $records[] = $record;
         }
 
         $versions = array_unique(array_map(static fn (MigrationRecord $record): string => $record->version, $records));
 
         if (count($versions) > 1) {
-            throw new \RuntimeException('Conflicting legacy migration versions; '
+            throw new MigrationOperationException('Conflicting legacy migration versions; '
                 . 'reconcile the exact mapped identities before execution.');
         }
 
@@ -183,23 +180,38 @@ final readonly class MigrationLifecycle
         return $this->runOperation($pluginSlug, [], fn (): bool => $this->markMigratedUnlocked($pluginSlug, $migration));
     }
 
-    public function adoptLegacyMigration(PluginSlug $pluginSlug, MigrationContract $migration, string $legacyKey, string $expectedVersion): bool
+    public function adoptLegacyMigration(PluginSlug $pluginSlug, MigrationContract $migration, string $legacyKey, string $expectedVersion, bool $retireSuperseded = false): bool
     {
         $key = MigrationKey::forMigration($migration);
+        MigrationKey::assertStorageIdentity($legacyKey);
         if (!str_contains($legacyKey, '@anonymous') || $legacyKey === $key || $expectedVersion === '') {
             throw new \InvalidArgumentException(
                 'Adoption requires an exact anonymous legacy identity and its recorded version.',
             );
         }
-        return $this->runOperation($pluginSlug, [], function () use ($pluginSlug, $key, $legacyKey, $expectedVersion): bool {
+        return $this->runOperation($pluginSlug, [], function () use ($pluginSlug, $key, $legacyKey, $expectedVersion, $retireSuperseded): bool {
             $legacy = $this->store->findRecord($pluginSlug->value, $legacyKey);
             $current = $this->store->findRecord($pluginSlug->value, $key);
             if (
                 $legacy === null || $legacy->version !== $expectedVersion
-                || ($current !== null && $current->version !== $expectedVersion)
             ) {
-                throw new \RuntimeException(
+                throw new MigrationOperationException(
                     'Legacy state does not match the reviewed version or conflicts with the stable identity.',
+                );
+            }
+            if ($current !== null) {
+                if (!$retireSuperseded) {
+                    throw new MigrationOperationException('Stable identity already exists; review this additional '
+                        . 'legacy record and use --retire-superseded to retain the stable version.');
+                }
+                return $this->store->deleteRecord($pluginSlug->value, $legacyKey)
+                    && $this->store->appendHistory(
+                        $this->createExecution($legacy, 'retire', $this->currentTimestamp()),
+                    );
+            }
+            if ($retireSuperseded) {
+                throw new MigrationOperationException(
+                    '--retire-superseded requires an existing adopted stable identity.',
                 );
             }
             $record = new MigrationRecord($pluginSlug->value, $key, $legacy->version, $legacy->migratedAt);

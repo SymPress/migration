@@ -6,13 +6,15 @@ namespace SymPress\WordPress\Migration\Infrastructure;
 
 use SymPress\WordPress\Migration\Contract\DeferredMigrationOperationExecutor;
 use SymPress\WordPress\Migration\Contract\MigrationSqlExecutor;
+use SymPress\WordPress\Migration\Exception\MigrationOperationException;
 
 final class WordPressSqlExecutor implements MigrationSqlExecutor, DeferredMigrationOperationExecutor
 {
-    private int $transactionDepth = 0;
-
-    public function __construct(private readonly \wpdb $database)
+    public function __construct(private readonly \wpdb $database, private readonly int $lockTimeout = 10)
     {
+        if ($lockTimeout < 0 || $lockTimeout > 3600) {
+            throw new \InvalidArgumentException('Migration lock timeout must be between 0 and 3600 seconds.');
+        }
     }
 
     /** @param string|list<string> $statements */
@@ -52,25 +54,61 @@ final class WordPressSqlExecutor implements MigrationSqlExecutor, DeferredMigrat
      */
     public function runDeferredOperation(string $scope, callable $statements, callable $operation): bool
     {
+        if ($scope === '') {
+            throw new \InvalidArgumentException('Migration operation scope must not be empty.');
+        }
+        $guard = MigrationDatabaseGuard::forDatabase($this->database);
+        if ($guard !== null) {
+            return $this->runLockedOperation($guard, $statements, $operation);
+        }
         $databaseName = $this->database->get_var('SELECT DATABASE()');
+        if (!is_string($databaseName) || $databaseName === '') {
+            throw new MigrationOperationException('Migration requires an active named database.');
+        }
+        // Plugins, custom metadata tables and shared ORM tables use one database-wide domain.
         $lock = 'sympress-migration:' . substr(
-            hash('sha256', $databaseName . ':' . $this->database->prefix . ':' . $scope),
+            hash('sha256', $databaseName),
             0,
             40,
         );
-        $acquired = $this->database->get_var($this->database->prepare('SELECT GET_LOCK(%s, 10)', $lock));
+        $acquired = $this->database->get_var($this->database->prepare(
+            'SELECT GET_LOCK(%s, %d)',
+            $lock,
+            $this->lockTimeout,
+        ));
 
         if ((string) $acquired !== '1') {
             return false;
         }
 
+        $guard = null;
+        try {
+            $guard = new MigrationDatabaseGuard(
+                $this->database,
+                $lock,
+                (string) $this->database->get_var('SELECT CONNECTION_ID()'),
+            );
+            return $this->runLockedOperation($guard, $statements, $operation);
+        } finally {
+            ($guard ?? MigrationDatabaseGuard::forDatabase($this->database))?->close();
+        }
+    }
+
+    /**
+     * @param callable(): (string|list<string>) $statements
+     * @param callable(string|list<string>): bool $operation
+     */
+    private function runLockedOperation(MigrationDatabaseGuard $guard, callable $statements, callable $operation): bool
+    {
         $started = false;
         $counted = false;
 
         try {
+            $guard->assertOwned();
             $resolved = $statements();
+            $guard->assertOwned();
             $transactional = $this->supportsTransaction($resolved);
-            if ($transactional && $this->transactionDepth === 0) {
+            if ($transactional && $guard->transactionDepth() === 0) {
                 $started = $this->database->query('START TRANSACTION') !== false;
 
                 if (!$started) {
@@ -79,11 +117,13 @@ final class WordPressSqlExecutor implements MigrationSqlExecutor, DeferredMigrat
             }
 
             if ($transactional) {
-                $this->transactionDepth++;
+                $guard->enterTransaction();
                 $counted = true;
             }
 
+            $guard->assertOwned();
             $success = $operation($resolved);
+            $guard->assertOwned();
 
             if ($started) {
                 if ($this->database->query($success ? 'COMMIT' : 'ROLLBACK') === false) {
@@ -100,17 +140,15 @@ final class WordPressSqlExecutor implements MigrationSqlExecutor, DeferredMigrat
 
             return $success;
         } catch (\Throwable $exception) {
-            if ($started) {
+            if ($started && $guard->isOwned()) {
                 $this->database->query('ROLLBACK');
             }
 
             throw $exception;
         } finally {
             if ($counted) {
-                $this->transactionDepth--;
+                $guard->leaveTransaction();
             }
-
-            $this->database->get_var($this->database->prepare('SELECT RELEASE_LOCK(%s)', $lock));
         }
     }
 
@@ -128,17 +166,21 @@ final class WordPressSqlExecutor implements MigrationSqlExecutor, DeferredMigrat
 
     private function executeStatement(string $statement): bool
     {
+        MigrationDatabaseGuard::assertDatabaseOwnership($this->database);
         if ($this->shouldUseDbDelta($statement)) {
             $this->loadWordPressUpgradeLibrary();
             $this->resetLastError();
 
             dbDelta($statement);
+            MigrationDatabaseGuard::assertDatabaseOwnership($this->database);
 
             return $this->lastErrorIsEmpty();
         }
 
         // @phpstan-ignore sympress.preparedSql (Reviewed Migration::up/down raw SQL contract, including DDL; metadata uses prepared SQL.)
-        return $this->database->query($statement) !== false;
+        $result = $this->database->query($statement);
+        MigrationDatabaseGuard::assertDatabaseOwnership($this->database);
+        return $result !== false;
     }
 
     private function shouldUseDbDelta(string $statement): bool

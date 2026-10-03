@@ -6,7 +6,9 @@ namespace SymPress\WordPress\Migration\Infrastructure;
 
 use SymPress\WordPress\Migration\Contract\MigrationStore;
 use SymPress\WordPress\Migration\Value\MigrationExecution;
+use SymPress\WordPress\Migration\Value\MigrationKey;
 use SymPress\WordPress\Migration\Value\MigrationRecord;
+use SymPress\WordPress\Migration\Value\PluginSlug;
 
 final class MigrationTracker implements MigrationStore
 {
@@ -86,6 +88,8 @@ final class MigrationTracker implements MigrationStore
     #[\Override]
     public function saveRecord(MigrationRecord $record): bool
     {
+        MigrationKey::assertStorageIdentity($record->migration);
+        PluginSlug::fromString($record->plugin);
         if (!$this->ensureTableExists()) {
             return false;
         }
@@ -111,6 +115,7 @@ final class MigrationTracker implements MigrationStore
             return true;
         }
 
+        MigrationDatabaseGuard::assertDatabaseOwnership($this->database);
         $result = $this->database->delete(
             $this->tableName,
             [
@@ -141,6 +146,7 @@ final class MigrationTracker implements MigrationStore
             return true;
         }
 
+        MigrationDatabaseGuard::assertDatabaseOwnership($this->database);
         $result = $this->database->delete(
             $this->tableName,
             ['plugin' => $plugin],
@@ -303,10 +309,13 @@ final class MigrationTracker implements MigrationStore
     #[\Override]
     public function appendHistory(MigrationExecution $execution): bool
     {
+        MigrationKey::assertStorageIdentity($execution->migration);
+        PluginSlug::fromString($execution->plugin);
         if (!$this->ensureHistoryTableExists()) {
             return false;
         }
 
+        MigrationDatabaseGuard::assertDatabaseOwnership($this->database);
         $result = $this->database->insert(
             $this->historyTableName,
             [
@@ -370,6 +379,7 @@ final class MigrationTracker implements MigrationStore
 
     private function insert(MigrationRecord $record): bool
     {
+        MigrationDatabaseGuard::assertDatabaseOwnership($this->database);
         $result = $this->database->insert(
             $this->tableName,
             [
@@ -386,6 +396,7 @@ final class MigrationTracker implements MigrationStore
 
     private function update(MigrationRecord $record): bool
     {
+        MigrationDatabaseGuard::assertDatabaseOwnership($this->database);
         $result = $this->database->update(
             $this->tableName,
             [
@@ -434,6 +445,7 @@ final class MigrationTracker implements MigrationStore
             return true;
         }
 
+        MigrationDatabaseGuard::assertDatabaseOwnership($this->database);
         // @phpstan-ignore argument.type (Nonempty constant template with a validated table identifier always produces SQL.)
         $result = $this->database->query($this->database->prepare('DROP TABLE IF EXISTS %i', $this->tableName));
 
@@ -451,6 +463,7 @@ final class MigrationTracker implements MigrationStore
             return true;
         }
 
+        MigrationDatabaseGuard::assertDatabaseOwnership($this->database);
         // @phpstan-ignore argument.type (Nonempty constant template with a validated table identifier always produces SQL.)
         $result = $this->database->query($this->database->prepare('DROP TABLE IF EXISTS %i', $this->historyTableName));
 
@@ -525,6 +538,7 @@ final class MigrationTracker implements MigrationStore
 
     private function createStateTable(): bool
     {
+        MigrationDatabaseGuard::assertDatabaseOwnership($this->database);
         $this->loadWordPressUpgradeLibrary();
 
         dbDelta($this->stateTableSql());
@@ -537,6 +551,7 @@ final class MigrationTracker implements MigrationStore
 
     private function createHistoryTable(): bool
     {
+        MigrationDatabaseGuard::assertDatabaseOwnership($this->database);
         $this->loadWordPressUpgradeLibrary();
 
         dbDelta($this->historyTableSql());
