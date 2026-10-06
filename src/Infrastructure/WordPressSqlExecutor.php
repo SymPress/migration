@@ -81,7 +81,6 @@ final class WordPressSqlExecutor implements MigrationSqlExecutor, DeferredMigrat
             return false;
         }
 
-        $guard = null;
         try {
             $guard = new MigrationDatabaseGuard(
                 $this->database,
