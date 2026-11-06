@@ -13,6 +13,10 @@ where applicable.
 - Share advisory locks across all migration scopes in a database, configure the timeout, and verify connection/lock ownership before SQL and metadata writes.
 - Continue other plugins only after typed operational failures; propagate PHP/programming errors immediately.
 
+## 1.0.9 — 2026-11-06
+
+- Use the Symfony 8.1.11 security patches released on November 4.
+
 ## 1.0.7 — 2026-10-02
 
 - Continue other plugins after a failed migration, then return a failing aggregate CLI result.
