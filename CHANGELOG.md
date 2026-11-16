@@ -13,6 +13,12 @@ where applicable.
 - Share advisory locks across all migration scopes in a database, configure the timeout, and verify connection/lock ownership before SQL and metadata writes.
 - Continue other plugins only after typed operational failures; propagate PHP/programming errors immediately.
 
+## 1.0.10 — 2026-11-16
+
+- Detect a failed `dbDelta()` query that a later successful query would have masked, so the migration is no longer recorded as applied with missing columns or indexes.
+- Restrict `wp migration version --delete` to local/development environments like `rollback` and `execute --down`, because it makes the next `migrate` run `up()` again.
+- Pin the shared `sympress/workflows` CI workflows to v1.3.2.
+
 ## 1.0.9 — 2026-11-06
 
 - Use the Symfony 8.1.11 security patches released on November 4.
