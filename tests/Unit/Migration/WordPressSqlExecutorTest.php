@@ -40,6 +40,30 @@ final class WordPressSqlExecutorTest extends TestCase
         ], $this->database->executedStatements);
     }
 
+    public function test_it_reports_a_failed_db_delta_alter_masked_by_a_later_success(): void
+    {
+        $create = 'CREATE TABLE wp_orders (id bigint unsigned NOT NULL, sku varchar(64) NOT NULL, UNIQUE KEY sku (sku))';
+        $failed = 'ALTER TABLE wp_orders ADD UNIQUE KEY `sku` (`sku`)';
+        WordPressState::$dbDeltaQueries[$create] = [
+            'DESCRIBE wp_orders;',
+            $failed,
+            'ALTER TABLE wp_orders CHANGE COLUMN `sku` sku varchar(64) NOT NULL',
+        ];
+        $this->database->failedStatements[] = $failed;
+
+        self::assertFalse($this->executor->execute($create));
+        self::assertSame([], WordPressState::$hooks['query'][10] ?? []);
+    }
+
+    public function test_it_ignores_the_describe_probe_dbdelta_runs_for_a_new_table(): void
+    {
+        $create = 'CREATE TABLE wp_orders (id bigint unsigned NOT NULL)';
+        WordPressState::$dbDeltaQueries[$create] = ['DESCRIBE wp_orders;', $create];
+        $this->database->failedStatements[] = 'DESCRIBE wp_orders;';
+
+        self::assertTrue($this->executor->execute($create));
+    }
+
     public function test_it_stops_after_the_first_database_error(): void
     {
         $failed = 'ALTER TABLE wp_orders ADD INDEX idx_id (id);';

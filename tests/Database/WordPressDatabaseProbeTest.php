@@ -76,6 +76,29 @@ final class WordPressDatabaseProbeTest extends TestCase
         ));
     }
 
+    public function testDbDeltaReportsAFailedAlterFollowedByASuccessfulOne(): void
+    {
+        $executor = new WordPressSqlExecutor($this->database);
+        self::assertTrue($executor->execute("CREATE TABLE {$this->table} (id bigint NOT NULL, dup int NOT NULL, other int NOT NULL, PRIMARY KEY  (id)) ENGINE=InnoDB"));
+        self::assertTrue($executor->execute("INSERT INTO {$this->table} (id, dup, other) VALUES (1, 7, 1), (2, 7, 2)"));
+        $this->database->suppress_errors(true);
+        try {
+            // The UNIQUE KEY fails on duplicate data; the later KEY succeeds and resets last_error.
+            self::assertFalse($executor->execute("CREATE TABLE {$this->table} (
+                id bigint NOT NULL,
+                dup int NOT NULL,
+                other int NOT NULL,
+                PRIMARY KEY  (id),
+                UNIQUE KEY dup (dup),
+                KEY other (other)
+            ) ENGINE=InnoDB"));
+        } finally {
+            $this->database->suppress_errors(false);
+        }
+        self::assertSame('other', $this->database->get_var($this->database->prepare('SHOW INDEX FROM %i WHERE Key_name = %s', $this->table, 'other'), 2));
+        self::assertNull($this->database->get_var($this->database->prepare('SHOW INDEX FROM %i WHERE Key_name = %s', $this->table, 'dup'), 2));
+    }
+
     public function test_it_persists_current_state_and_append_only_history(): void
     {
         $tracker = new MigrationTracker($this->database);

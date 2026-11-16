@@ -168,12 +168,10 @@ final class WordPressSqlExecutor implements MigrationSqlExecutor, DeferredMigrat
         MigrationDatabaseGuard::assertDatabaseOwnership($this->database);
         if ($this->shouldUseDbDelta($statement)) {
             $this->loadWordPressUpgradeLibrary();
-            $this->resetLastError();
-
-            dbDelta($statement);
+            $succeeded = $this->runDbDelta($statement);
             MigrationDatabaseGuard::assertDatabaseOwnership($this->database);
 
-            return $this->lastErrorIsEmpty();
+            return $succeeded;
         }
 
         // @phpstan-ignore sympress.preparedSql (Reviewed Migration::up/down raw SQL contract, including DDL; metadata uses prepared SQL.)
@@ -206,13 +204,35 @@ final class WordPressSqlExecutor implements MigrationSqlExecutor, DeferredMigrat
         require_once $absolutePath . 'wp-admin/includes/upgrade.php';
     }
 
-    private function resetLastError(): void
+    /**
+     * dbDelta() runs several queries and each one resets last_error, so a failed ALTER
+     * would be masked by a later successful one. Check the error before every next query.
+     */
+    private function runDbDelta(string $statement): bool
     {
         $this->database->last_error = '';
+        $failed = false;
+        $previous = '';
+        $inspect = function (string $query) use (&$failed, &$previous): string {
+            $failed = $failed || $this->previousQueryFailed($previous);
+            $previous = $query;
+
+            return $query;
+        };
+
+        add_filter('query', $inspect);
+        try {
+            dbDelta($statement);
+        } finally {
+            remove_filter('query', $inspect);
+        }
+
+        return !$failed && !$this->previousQueryFailed($previous);
     }
 
-    private function lastErrorIsEmpty(): bool
+    private function previousQueryFailed(string $previous): bool
     {
-        return $this->database->last_error === '';
+        // dbDelta() probes for missing tables with DESCRIBE on purpose; that error is expected.
+        return $this->database->last_error !== '' && preg_match('/^\s*DESCRIBE\b/i', $previous) !== 1;
     }
 }
