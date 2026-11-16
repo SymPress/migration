@@ -13,6 +13,6 @@ jobs:
     permissions:
       contents: read
       issues: write
-    uses: sympress/workflows/.github/workflows/dependency-canary.yml@78d083a9a0176cf0252318b0c69fc64938a727d6
+    uses: sympress/workflows/.github/workflows/dependency-canary.yml@2ebe47e2bc6d402c172015b64c0f5a9f2bf0c322 # v1.3.2
     with:
       php_version: '8.5'
