@@ -12,6 +12,9 @@ namespace SymPress\WordPress\Migration\Tests\Support {
         /** @var list<string> */
         public static array $dbDelta = [];
 
+        /** @var array<string, list<string>> Queries the dbDelta() stub runs for a statement, e.g. generated ALTERs. */
+        public static array $dbDeltaQueries = [];
+
         /**
          * @var array{
          *     commands: list<array{name: string, class: string}>,
@@ -32,6 +35,7 @@ namespace SymPress\WordPress\Migration\Tests\Support {
         {
             self::$hooks = [];
             self::$dbDelta = [];
+            self::$dbDeltaQueries = [];
             self::$cliCalls = [
                 'commands' => [],
                 'log' => [],
@@ -402,7 +406,7 @@ namespace {
 
             public function query(string $query): int|false
             {
-                $statement = $this->normalizeStatement($query);
+                $statement = $this->normalizeStatement((string) apply_filters('query', $query));
                 $this->executedStatements[] = $statement;
 
                 if (in_array($statement, $this->failedStatements, true)) {
@@ -590,6 +594,44 @@ namespace {
         }
     }
 
+    if (!function_exists('add_filter')) {
+        function add_filter(string $hook, callable $callback, int $priority = 10, int $acceptedArgs = 1): bool
+        {
+            add_action($hook, $callback, $priority, $acceptedArgs);
+
+            return true;
+        }
+    }
+
+    if (!function_exists('remove_filter')) {
+        function remove_filter(string $hook, callable $callback, int $priority = 10): bool
+        {
+            $callbacks = WordPressState::$hooks[$hook][$priority] ?? [];
+            WordPressState::$hooks[$hook][$priority] = array_values(array_filter(
+                $callbacks,
+                static fn (array $registered): bool => $registered['callback'] !== $callback,
+            ));
+
+            return count($callbacks) !== count(WordPressState::$hooks[$hook][$priority]);
+        }
+    }
+
+    if (!function_exists('apply_filters')) {
+        function apply_filters(string $hook, mixed $value, mixed ...$args): mixed
+        {
+            $callbacksByPriority = WordPressState::$hooks[$hook] ?? [];
+            ksort($callbacksByPriority);
+
+            foreach ($callbacksByPriority as $callbacks) {
+                foreach ($callbacks as $callback) {
+                    $value = ($callback['callback'])(...array_slice([$value, ...$args], 0, $callback['accepted_args']));
+                }
+            }
+
+            return $value;
+        }
+    }
+
     if (!function_exists('current_time')) {
         function current_time(string $type = 'mysql', bool $gmt = false): string
         {
@@ -605,7 +647,9 @@ namespace {
             $database = $GLOBALS['wpdb'] ?? null;
 
             if ($database instanceof wpdb) {
-                $database->query($sql);
+                foreach (WordPressState::$dbDeltaQueries[$sql] ?? [$sql] as $query) {
+                    $database->query($query);
+                }
             }
 
             return [$sql];
