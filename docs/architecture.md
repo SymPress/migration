@@ -35,7 +35,9 @@ status check that could become stale. Concurrent forward work cannot turn this
 call into a rollback. The library default remains `allowRollback: true` for
 explicitly reviewed inverse migrations; direct library calls do not infer a
 WordPress environment. Metadata-only `version --add/--delete` remains an
-explicit reconciliation operation and does not execute migration SQL.
+explicit reconciliation operation and does not execute migration SQL. Because
+`--delete` makes the next `migrate` run `up()` again, it shares the CLI rollback
+restriction to local/development environments.
 
 ## State model
 

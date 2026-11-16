@@ -92,6 +92,10 @@ final readonly class MigrationCommandExecutor
         $pluginSlug = $this->context->requirePluginSlug($args, 'version');
         $migrationClass = $this->context->requireMigrationClass($args, 'version');
         $direction = $this->resolveVersionDirection($assocArgs);
+        if ($direction === 'down') {
+            // Unmarking re-runs a non-idempotent up() on the next migrate, like a rollback.
+            $this->context->requireRollbackEnvironment();
+        }
         $manager = $this->context->managerOrFail($pluginSlug);
 
         if (!$manager->markMigration($migrationClass, $direction)) {

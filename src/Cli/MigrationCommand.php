@@ -117,7 +117,7 @@ final readonly class MigrationCommand
      * : Mark the version as migrated.
      *
      * --delete
-     * : Mark the version as rolled back.
+     * : Mark the version as rolled back. Local/development environments only.
      *
      * @param list<string> $args
      * @param array<string, scalar|null> $assocArgs
