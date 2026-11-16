@@ -50,6 +50,7 @@ final class MigrationRollbackPolicyTest extends TestCase
             fn () => $command->migrate(['my-plugin', '1.0.0']),
             fn () => $command->migrate(['my-plugin', CreateCustomersTableMigration::class]),
             fn () => $command->run(['my-plugin', 'CreateCustomersTableMigration']),
+            fn () => $command->version(['my-plugin', 'AddCustomersEmailIndexMigration'], ['delete' => true]),
         ] as $operation) {
             $database->executedStatements = [];
             try {
@@ -90,6 +91,9 @@ final class MigrationRollbackPolicyTest extends TestCase
         $command->execute(['my-plugin', 'CreateCustomersTableMigration'], ['down' => true]);
         self::assertSame([], $manager->getMigratedVersions());
         $command->execute(['my-plugin', 'CreateCustomersTableMigration'], ['up' => true]);
+        $command->version(['my-plugin', 'CreateCustomersTableMigration'], ['delete' => true]);
+        self::assertSame([], $manager->getMigratedVersions());
+        $command->version(['my-plugin', 'CreateCustomersTableMigration'], ['add' => true]);
         $command->rollback(['my-plugin'], ['migration' => 'CreateCustomersTableMigration']);
         self::assertSame([], $manager->getMigratedVersions());
         $command->migrate(['my-plugin']);

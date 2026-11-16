@@ -149,7 +149,8 @@ wp migration migrate
 wp migration migrate orders-plugin
 wp migration migrate orders-plugin 1.0.0
 wp migration run orders-plugin
-# Rollbacks require WordPress local/development; staging/production are blocked.
+# Rollbacks, execute --down and version --delete require WordPress local/development;
+# staging/production are blocked.
 wp migration rollback orders-plugin
 wp migration rollback orders-plugin --migration=CreateOrdersTableMigration
 wp migration execute orders-plugin CreateOrdersTableMigration --up
