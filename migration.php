@@ -27,9 +27,6 @@ if (!class_exists(MigrationBundle::class)) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
 
-add_action('kernel.add-providers', static function (): void {
-});
-
 add_action('muplugins_loaded', static function (): void {
     (new MigrationSystemBootstrap(MigrationSystem::getInstance()))->initialize();
     (new MigrationCliBootstrap(MigrationBootstrap::getInstance()))->initialize();
