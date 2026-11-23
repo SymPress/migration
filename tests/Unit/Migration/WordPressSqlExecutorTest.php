@@ -64,6 +64,18 @@ final class WordPressSqlExecutorTest extends TestCase
         self::assertTrue($this->executor->execute($create));
     }
 
+    public function test_it_refuses_db_delta_on_a_connection_other_than_the_global_wpdb(): void
+    {
+        $GLOBALS['wpdb'] = new \wpdb();
+
+        try {
+            $this->executor->execute('CREATE TABLE wp_orders (id bigint unsigned NOT NULL)');
+            self::fail('dbDelta() always targets the global $wpdb.');
+        } catch (\LogicException) {
+            self::assertSame([], WordPressState::$dbDelta);
+        }
+    }
+
     public function test_it_stops_after_the_first_database_error(): void
     {
         $failed = 'ALTER TABLE wp_orders ADD INDEX idx_id (id);';

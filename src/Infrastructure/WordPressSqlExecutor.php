@@ -167,6 +167,11 @@ final class WordPressSqlExecutor implements MigrationSqlExecutor, DeferredMigrat
     {
         MigrationDatabaseGuard::assertDatabaseOwnership($this->database);
         if ($this->shouldUseDbDelta($statement)) {
+            // dbDelta() always uses the global $wpdb, which would bypass this connection's lock and error checks.
+            if (($GLOBALS['wpdb'] ?? null) !== $this->database) {
+                throw new \LogicException('CREATE TABLE migrations require the global $wpdb connection.');
+            }
+
             $this->loadWordPressUpgradeLibrary();
             $succeeded = $this->runDbDelta($statement);
             MigrationDatabaseGuard::assertDatabaseOwnership($this->database);
