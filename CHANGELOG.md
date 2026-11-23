@@ -6,13 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 where applicable.
 
-## Unreleased
-
-- Require explicit retirement for additional legacy adoptions without changing the canonical version; expose exact adoption diagnostics in status and reject canonical/alias version conflicts.
-- Validate migration identities and plugin slugs against the 191-byte metadata storage limit before writes.
-- Share advisory locks across all migration scopes in a database, configure the timeout, and verify connection/lock ownership before SQL and metadata writes.
-- Continue other plugins only after typed operational failures; propagate PHP/programming errors immediately.
-
 ## 1.0.10 — 2026-11-16
 
 - Detect a failed `dbDelta()` query that a later successful query would have masked, so the migration is no longer recorded as applied with missing columns or indexes.
@@ -22,6 +15,13 @@ where applicable.
 ## 1.0.9 — 2026-11-06
 
 - Use the Symfony 8.1.11 security patches released on November 4.
+
+## 1.0.8 — 2026-10-03
+
+- Require explicit retirement for additional legacy adoptions without changing the canonical version; expose exact adoption diagnostics in status and reject canonical/alias version conflicts.
+- Validate migration identities and plugin slugs against the 191-byte metadata storage limit before writes.
+- Share advisory locks across all migration scopes in a database, configure the timeout, and verify connection/lock ownership before SQL and metadata writes.
+- Continue other plugins only after typed operational failures; propagate PHP/programming errors immediately.
 
 ## 1.0.7 — 2026-10-02
 
@@ -54,7 +54,15 @@ where applicable.
 - Correct WP-CLI execution flag synopsis so `--up` and `--down` are recognized;
   the executor continues to require exactly one direction.
 
-## Unreleased
+## 1.0.2 — 2026-10-02
+
+### Fixed
+
+- Lock migration operations and keep deployment-stable migration state.
+- Reconcile migration identities and the order of pending schema migrations.
+- Replace migration definitions explicitly and run the database suite against a real database in CI.
+
+## 1.0.1 — 2026-06-19
 
 ### Changed
 
@@ -63,4 +71,5 @@ where applicable.
 
 ### Fixed
 
+- Correct the migration tracker query template.
 - Cover rollback behavior when a migration fails during reverse execution.
