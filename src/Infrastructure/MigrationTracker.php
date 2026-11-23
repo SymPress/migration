@@ -31,7 +31,8 @@ final class MigrationTracker implements MigrationStore
             : $tableName . '_history';
 
         foreach ([$this->tableName, $this->historyTableName] as $identifier) {
-            if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $identifier) !== 1) {
+            // WordPress prefixes may start with a digit; MySQL only rejects unquoted all-digit names.
+            if (preg_match('/^[A-Za-z0-9_]+$/D', $identifier) !== 1 || ctype_digit($identifier)) {
                 throw new \InvalidArgumentException('Migration table names must be SQL identifiers.');
             }
         }
