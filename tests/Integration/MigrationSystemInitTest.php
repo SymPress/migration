@@ -13,7 +13,6 @@ use PHPUnit\Framework\TestCase;
 
 final class MigrationSystemInitTest extends TestCase
 {
-    private const string APP_PROVIDER_HOOK = 'kernel.add-providers';
     private const string STATE_GLOBAL_KEY = 'sympress_wordpress_migration_muplugin_state';
 
     #[\Override]
@@ -29,12 +28,11 @@ final class MigrationSystemInitTest extends TestCase
         $GLOBALS['wpdb'] = new \wpdb();
     }
 
-    public function test_loader_file_registers_the_app_and_muplugin_hooks(): void
+    public function test_loader_file_registers_only_the_muplugin_hook(): void
     {
         require dirname(__DIR__, 2) . '/migration.php';
 
-        self::assertArrayHasKey(self::APP_PROVIDER_HOOK, WordPressState::$hooks);
-        self::assertArrayHasKey('muplugins_loaded', WordPressState::$hooks);
+        self::assertSame(['muplugins_loaded'], array_keys(WordPressState::$hooks));
     }
 
     public function test_kernel_and_muplugin_bootstraps_fire_the_ready_action_once(): void
