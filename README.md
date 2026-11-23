@@ -73,7 +73,7 @@ add_action('db_migration_register', static function (MigrationSystem $system): v
 
 Use `MigrationSystem::getInstance()->createMigrationManager('orders-plugin')` when you want to run migrations from an activation hook, deploy hook, admin workflow, or custom release pipeline.
 
-When the project boots `SymPress\Kernel\App`, the MU plugin also registers its `CoreProvider` and `CliProvider` through `kernel`.
+When the project boots `SymPress\Kernel\App`, the kernel loads `MigrationBundle` (declared under `extra.kernel` in `composer.json`), which registers the migration services and the same `muplugins_loaded` bootstraps as container services.
 
 ## Metadata Storage
 
