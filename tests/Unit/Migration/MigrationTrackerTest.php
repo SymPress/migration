@@ -31,6 +31,19 @@ final class MigrationTrackerTest extends TestCase
         new MigrationTracker($this->database, 'wp_migrations; DROP TABLE wp_users');
     }
 
+    public function testAcceptsWordPressPrefixesThatStartWithADigit(): void
+    {
+        $this->database->prefix = '7x_';
+
+        self::assertSame('7x_migrations', (new MigrationTracker($this->database))->getTableName());
+    }
+
+    public function testRejectsAllDigitTableNamesThatMySqlCannotUseUnquoted(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new MigrationTracker($this->database, '123');
+    }
+
     public function test_it_creates_state_and_history_tables_once(): void
     {
         self::assertFalse($this->database->hasTable('wp_migrations'));
