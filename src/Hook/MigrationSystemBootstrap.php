@@ -17,7 +17,8 @@ final class MigrationSystemBootstrap
 
     public function initialize(): void
     {
-        if (!$this->shouldInitialize()) {
+        // The kernel hook and the MU plugin loader both run this; announce readiness only once.
+        if ($this->system->isInitialized() || !$this->shouldInitialize()) {
             return;
         }
 
