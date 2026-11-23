@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 where applicable.
 
+## 1.0.11 — 2026-11-23
+
+- Accept WordPress table prefixes that start with a digit (for example `7x_`); the tracker no longer throws on every request and takes the site down.
+- Fire `db_migration_system_ready` only once when both the kernel and the MU plugin loader bootstrap the migration system.
+- Refuse `CREATE TABLE` migrations on a `wpdb` connection other than the global `$wpdb`, because `dbDelta()` would bypass that connection's lock and error checks.
+- Remove the empty `kernel.add-providers` callback from the loader and correct the README's kernel integration notes.
+- Let Dependabot update the pinned GitHub Actions.
+
 ## 1.0.10 — 2026-11-16
 
 - Detect a failed `dbDelta()` query that a later successful query would have masked, so the migration is no longer recorded as applied with missing columns or indexes.
